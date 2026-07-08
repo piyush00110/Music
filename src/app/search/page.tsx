@@ -1,29 +1,37 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import type { Track } from '@/lib/types';
 import { searchMusic, getTrending, GENRES, getRecommendations } from '@/lib/music';
 import SongCard from '@/components/SongCard';
 import EnhancedVisualizer from '@/components/EnhancedVisualizer';
 import { usePlayer } from '@/lib/PlayerContext';
 import { useSearch } from '@/lib/SearchContext';
+import { useSearchParams } from 'next/navigation';
 
 const POPULAR_SEARCHES = [
   'Top hits 2025', 'Chill vibes', 'Workout music', 'Classical piano',
   'Jazz relaxing', 'Electronic dance', 'Acoustic covers', 'LoFi beats',
 ];
 
-export default function SearchPage() {
+function SearchContent() {
   const sc = useSearch();
-  const [query, setQuery] = useState(sc.query || '');
+  const urlParams = useSearchParams();
+  const initialQ = urlParams?.get('q') || '';
+  const [query, setQuery] = useState(sc.query || initialQ || '');
   const [results, setResults] = useState<Track[]>(sc.results || []);
-  const [loading, setLoading] = useState(!sc.results.length);
+  const [loading, setLoading] = useState(!sc.results.length && !initialQ);
   const [error, setError] = useState('');
   const [recs, setRecs] = useState<Track[]>([]);
   const { isPlaying, recentlyPlayed } = usePlayer();
   const restored = useRef(false);
 
   useEffect(() => {
+    if (initialQ) {
+      setQuery(initialQ);
+      doSearch(initialQ);
+      return;
+    }
     if (sc.results.length) {
       setResults(sc.results);
       setQuery(sc.query || '');
@@ -201,5 +209,17 @@ export default function SearchPage() {
         </section>
       )}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-16">
+        <div className="w-10 h-10 rounded-full border-2 border-[#D4AF37]/20 border-t-[#D4AF37] animate-spin" />
+      </div>
+    }>
+      <SearchContent />
+    </Suspense>
   );
 }
