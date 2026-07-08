@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
   "functions": {
-    "api/**": {
+    "src/app/api/**/*": {
       "maxDuration": 30
     }
   }
