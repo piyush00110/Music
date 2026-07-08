@@ -3,9 +3,7 @@ import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { PlayerProvider } from "@/lib/PlayerContext";
 import { SearchProvider } from "@/lib/SearchContext";
-import Header from "@/components/Header";
-import BottomNav from "@/components/BottomNav";
-import NowPlayingBar from "@/components/NowPlayingBar";
+import LayoutShell from "@/components/LayoutShell";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 const inter = Inter({
@@ -39,10 +37,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-[#050505] text-[#e5e2e1] noise-bg">
         <SearchProvider>
           <PlayerProvider>
-            <Header />
-            <main className="flex-1 pt-16 pb-28 md:pb-20"><ErrorBoundary>{children}</ErrorBoundary></main>
-            <NowPlayingBar />
-            <BottomNav />
+            <ErrorBoundary>
+              <LayoutShell>{children}</LayoutShell>
+            </ErrorBoundary>
           </PlayerProvider>
         </SearchProvider>
       </body>
