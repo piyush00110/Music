@@ -7,25 +7,34 @@ export const runtime = 'nodejs';
 import yts from 'yt-search';
 
 const INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-const CLIENT_VERSION = '2.20250101.00.00';
 
 async function searchInnerTube(query: string) {
+  const body = {
+    context: { client: { clientName: 'WEB', clientVersion: '2.20250101.00.00', hl: 'en', gl: 'US' } },
+    query,
+  };
   const res = await fetch('https://www.youtube.com/youtubei/v1/search?key=' + INNERTUBE_KEY, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      context: { client: { clientName: 'WEB', clientVersion: CLIENT_VERSION, hl: 'en', gl: 'US' } },
-      query,
-    }),
-    signal: AbortSignal.timeout(10000),
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Origin': 'https://www.youtube.com',
+      'Referer': 'https://www.youtube.com/',
+      'X-YouTube-Client-Name': '1',
+      'X-YouTube-Client-Version': '2.20250101.00.00',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(12000),
   });
-  if (!res.ok) return null;
+  if (!res.ok) { console.error('InnerTube HTTP', res.status); return null; }
   const data = await res.json();
-  const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+  if (data.error) { console.error('InnerTube error', JSON.stringify(data.error)); return null; }
+  const rawContents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
   const items: any[] = [];
-  for (const section of contents) {
-    const videos = section?.itemSectionRenderer?.contents || [];
-    for (const v of videos) {
+  for (const section of rawContents) {
+    for (const v of (section?.itemSectionRenderer?.contents || [])) {
       const vr = v?.videoRenderer;
       if (!vr?.videoId) continue;
       items.push({
@@ -76,7 +85,6 @@ export async function GET(request: Request) {
   const query = searchParams.get('q');
   if (!query?.trim()) return NextResponse.json({ items: [] });
 
-  // Try multiple strategies in order
   let items = await searchInnerTube(query).catch(() => null);
   if (!items) items = await searchYouTubeAPI(query).catch(() => null);
   if (!items) items = await searchYtSearch(query).catch(() => null);
