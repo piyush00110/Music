@@ -16,12 +16,24 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
   const isCurrentTrack = currentTrack?.id === track.id;
   const [dl, setDl] = useState(false);
 
+  function triggerDownload(url: string, filename: string) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   const downloadTrack = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (track.youtubeId) {
       setDl(true);
-      window.location.href = `/api/download?id=${track.youtubeId}&title=${encodeURIComponent(track.title)}`;
-      setTimeout(() => setDl(false), 3000);
+      triggerDownload(
+        `/api/download?id=${track.youtubeId}&title=${encodeURIComponent(track.title)}`,
+        `${track.title.replace(/[^\w\s]/g, '').trim() || 'song'}.m4a`,
+      );
+      setTimeout(() => setDl(false), 5000);
       return;
     }
     const url = track.preview;
@@ -30,13 +42,10 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
       const blob = await res.blob();
-      const ext = blob.type.includes('mp4') || blob.type.includes('mpeg') ? 'mp3' : 'mp3';
-      const fn = `${track.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.${ext}`;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = fn;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      const ext = blob.type.includes('mp4') ? 'm4a' : 'mp3';
+      const objUrl = URL.createObjectURL(blob);
+      triggerDownload(objUrl, `${track.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.${ext}`);
+      setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
     } catch { window.open(url, '_blank'); }
     setDl(false);
   };

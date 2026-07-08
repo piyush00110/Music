@@ -1,12 +1,8 @@
 'use client';
 
 import { usePlayer } from '@/lib/PlayerContext';
-import ProgressBar from '@/components/ProgressBar';
-import EnhancedVisualizer from '@/components/EnhancedVisualizer';
-import Equalizer from '@/components/Equalizer';
-import Recommendations from '@/components/Recommendations';
 import Link from 'next/link';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 function extractColor(imgUrl: string): Promise<string> {
   return new Promise(resolve => {
@@ -54,8 +50,10 @@ export default function PlayerPage() {
   } = usePlayer();
   const [showEq, setShowEq] = useState(false);
   const [showSfx, setShowSfx] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [bgColor, setBgColor] = useState('#0a0a0f');
-  const artRef = useRef<HTMLDivElement>(null);
+  const [sheetMode, setSheetMode] = useState<'lyrics' | 'queue' | 'controls'>('lyrics');
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!currentTrack) return;
@@ -72,21 +70,27 @@ export default function PlayerPage() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const pct = duration > 0 ? (progress / duration) * 100 : 0;
+  const circumference = 2 * Math.PI * 48;
+  const offset = circumference - (pct / 100) * circumference;
+
+  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    seek(Number(e.target.value));
+  }, [seek]);
+
   if (!currentTrack) {
     return (
-      <div className="flex items-center justify-center min-h-[70vh] px-4">
-        <div className="relative glass-panel rounded-3xl p-12 text-center max-w-md overflow-hidden">
-          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#D4AF37]/5 blur-3xl rounded-full" />
+      <div className="flex items-center justify-center min-h-[70vh] px-4 bg-[#050505]">
+        <div className="relative rounded-3xl p-12 text-center max-w-md overflow-hidden bg-white/[0.03] border border-white/[0.06]">
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/5 blur-3xl rounded-full" />
           <div className="relative z-10">
             <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center border border-white/[0.06]">
-              <svg className="w-12 h-12 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377" />
-              </svg>
+              <span className="material-symbols-outlined text-5xl text-zinc-600">music_note</span>
             </div>
             <p className="text-zinc-400 text-lg mb-2 font-[family-name:var(--font-serif)]">No track playing</p>
             <p className="text-zinc-600 text-sm mb-6">Search millions of songs</p>
-            <Link href="/" className="px-6 py-3 bg-gradient-to-r from-[#D4AF37] to-[#FFD700] text-black rounded-full text-sm font-semibold hover:shadow-xl hover:shadow-[#D4AF37]/30 transition-all inline-flex items-center gap-2 active:scale-95">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            <Link href="/" className="px-6 py-3 bg-gradient-to-r from-primary-container to-gold-light text-black rounded-full text-sm font-semibold hover:shadow-xl hover:shadow-primary/30 transition-all inline-flex items-center gap-2 active:scale-95">
+              <span className="material-symbols-outlined text-lg">play_arrow</span>
               Browse Music
             </Link>
           </div>
@@ -99,254 +103,300 @@ export default function PlayerPage() {
   const artSrc = useYtThumb ? `https://i.ytimg.com/vi/${currentTrack.youtubeId}/hqdefault.jpg` : currentTrack.album.cover_medium;
 
   return (
-    <div className="relative min-h-[calc(100vh-12rem)] flex flex-col items-center px-4 md:px-8 py-6 max-w-2xl mx-auto">
-      {/* Dynamic gradient background */}
-      <div className="fixed inset-0 pointer-events-none transition-colors duration-1000" style={{ background: `radial-gradient(ellipse at 50% 0%, ${bgColor}66 0%, transparent 70%)` }} />
-      <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-transparent via-[#0f0f0f]/60 to-[#0f0f0f]" />
+    <div className="relative min-h-screen bg-[#050505] overflow-hidden flex flex-col">
+      <div className="full-bleed-bg" style={{ backgroundImage: `url(${artSrc})` }} />
+      <div className="obsidian-gradient" />
 
-      <div className="relative z-10 w-full flex flex-col items-center slide-up">
-        {/* Album art with vinyl effect */}
-        <div ref={artRef} className="relative group mb-5">
-          {/* Ambient glow */}
-          <div className={`absolute -inset-8 rounded-full bg-gradient-to-br from-[#D4AF37]/20 via-transparent to-[#D4AF37]/5 blur-3xl transition-opacity duration-700 ${isPlaying ? 'opacity-100' : 'opacity-50'}`} />
-
-          {/* Vinyl record outer */}
-          <div className={`relative w-64 h-64 md:w-72 md:h-72 rounded-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black p-2 shadow-2xl shadow-black/50 ${isPlaying ? 'animate-spin-slow' : ''}`}
-            style={{ animationDuration: '6s', animationTimingFunction: 'linear', animationIterationCount: 'infinite', animationPlayState: isPlaying ? 'running' : 'paused' }}>
-            {/* Grooves */}
-            <div className="absolute inset-3 rounded-full border border-white/[0.03]" />
-            <div className="absolute inset-6 rounded-full border border-white/[0.02]" />
-            <div className="absolute inset-9 rounded-full border border-white/[0.02]" />
-            <div className="absolute inset-12 rounded-full border border-white/[0.015]" />
-            <div className="absolute inset-15 rounded-full border border-white/[0.01]" />
-            {/* Album art */}
-            <div className="w-full h-full rounded-full overflow-hidden ring-2 ring-white/[0.08]">
-              {artSrc ? (
-                <img src={artSrc} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
-                  <svg className="w-16 h-16 text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377" />
-                  </svg>
-                </div>
-              )}
-            </div>
-            {/* Reflection overlay */}
-            <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-t from-transparent via-transparent to-white/[0.03]" />
-            <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-b from-transparent via-transparent to-black/[0.3]" />
+      {/* Top App Bar */}
+      <header className="fixed top-0 left-0 w-full z-50 flex flex-col items-center pt-8 px-gutter">
+        <div className="w-full flex items-center justify-between max-w-screen-xl">
+          <Link href="/" className="text-on-surface/70 active:scale-95 duration-200 p-2">
+            <span className="material-symbols-outlined">expand_more</span>
+          </Link>
+          <div className="flex flex-col items-center">
+            <p className="text-[10px] font-headline-md tracking-[0.2em] uppercase text-primary/80 mb-0.5">Master Quality Audio</p>
+            <h1 className="font-label-sm text-label-sm tracking-widest text-on-surface/60 uppercase">Now Playing</h1>
           </div>
+          <button onClick={() => setShowMore(!showMore)} className="text-on-surface/70 active:scale-95 duration-200 p-2">
+            <span className="material-symbols-outlined">more_vert</span>
+          </button>
+        </div>
+      </header>
 
-          {/* Center play/pause button */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/[0.1] flex items-center justify-center shadow-xl transition-all duration-300 hover:scale-105 active:scale-95">
-              <button
-                onClick={() => (isPlaying ? pause() : resume())}
-                className="w-11 h-11 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD700] flex items-center justify-center transition-all shadow-lg shadow-[#D4AF37]/30"
-              >
-                {isPlaying ? (
-                  <svg className="w-5 h-5 text-black" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-black ml-0.5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                )}
+      {/* More menu dropdown */}
+      {showMore && (
+        <div className="fixed top-20 right-6 z-50 bg-[#1c1b1b]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-3 min-w-[200px] shadow-2xl fade-in">
+          <div className="space-y-1">
+            <button onClick={() => { setShowEq(!showEq); setShowMore(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-zinc-300 hover:bg-white/[0.06] transition-all">
+              <span className="material-symbols-outlined text-primary text-xl">tune</span>
+              <span>Equalizer</span>
+            </button>
+            <button onClick={() => { setShowSfx(!showSfx); setShowMore(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-zinc-300 hover:bg-white/[0.06] transition-all">
+              <span className="material-symbols-outlined text-primary text-xl">graphic_eq</span>
+              <span>Sound FX</span>
+            </button>
+            <button onClick={() => { downloadCurrentTrack(); setShowMore(false); }} disabled={downloading} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-zinc-300 hover:bg-white/[0.06] transition-all disabled:opacity-40">
+              <span className="material-symbols-outlined text-primary text-xl">download</span>
+              <span>{downloading ? 'Saving...' : 'Download'}</span>
+            </button>
+            <div className="h-px bg-white/[0.06] my-1" />
+            <div className="px-3 py-2">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Audio Quality</p>
+              <div className="flex gap-1">
+                {['low', 'mid', 'high'].map(q => (
+                  <button key={q} onClick={() => setAudioQuality(q)}
+                    className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] uppercase tracking-wider transition-all font-medium ${
+                      audioQuality === q ? 'bg-primary/20 text-primary' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
+                    }`}>
+                    {q === 'high' ? 'HD' : q === 'mid' ? 'SD' : 'Low'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="h-px bg-white/[0.06] my-1" />
+            <div className="px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm text-zinc-500">volume_up</span>
+                <div className="flex-1 relative h-1 rounded-full bg-white/[0.08] overflow-hidden">
+                  <div className="h-full rounded-full bg-primary/60 transition-all duration-200" style={{ width: `${volume * 100}%` }} />
+                  <input type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EQ / FX panels */}
+      <div className="fixed inset-x-0 top-24 z-40 px-gutter max-w-lg mx-auto">
+        {showEq && (
+          <div className="bg-[#1c1b1b]/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-5 mb-3 fade-in">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs text-zinc-400 uppercase tracking-wider">Equalizer</h3>
+              <button onClick={() => setShowEq(false)} className="text-zinc-500 hover:text-white">
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Track info with marquee */}
-        <div className="w-full text-center mb-3 max-w-sm">
-          <MarqueeText text={currentTrack.title} className="text-lg md:text-xl font-[family-name:var(--font-serif)] text-white font-semibold mb-1" />
-          <p className="text-sm text-zinc-400 truncate">{currentTrack.artist.name}</p>
-        </div>
-
-        {/* Rich visualizer */}
-        <div className="w-full mb-4">
-          <EnhancedVisualizer isPlaying={isPlaying} barCount={64} height={40} />
-        </div>
-
-        {/* Premium progress */}
-        <div className="w-full mb-5">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] text-zinc-600 font-mono tabular-nums">{formatTime(progress)}</span>
-            <span className="text-[10px] text-zinc-600 font-mono tabular-nums">{formatTime(duration)}</span>
-          </div>
-          <div className="relative h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD700] transition-all duration-300 ease-out relative" style={{ width: `${(progress / (duration || 1)) * 100}%` }}>
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-lg shadow-[#D4AF37]/40" />
-            </div>
-            <input type="range" min={0} max={duration || 1} value={progress} onChange={e => seek(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-          </div>
-        </div>
-
-        {/* Luxe controls */}
-        <div className="flex items-center justify-center gap-5 md:gap-6 mb-5">
-          <button onClick={toggleShuffle} className={`transition-all duration-300 active:scale-90 ${shuffle ? 'text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.3)]' : 'text-zinc-500 hover:text-white'}`} title="Shuffle">
-            <svg className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-            </svg>
-          </button>
-
-          <button onClick={prev} className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all active:scale-90 border border-white/[0.04]" title="Previous">
-            <svg className="w-4 h-4 md:w-5 md:h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
-          </button>
-
-          <button onClick={() => (isPlaying ? pause() : resume())} className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFD700] flex items-center justify-center transition-all duration-300 shadow-2xl shadow-[#D4AF37]/30 hover:shadow-[#D4AF37]/50 active:scale-95 hover:scale-105" title={isPlaying ? 'Pause' : 'Play'}>
-            {isPlaying ? (
-              <svg className="w-6 h-6 md:w-7 md:h-7 text-black" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
-            ) : (
-              <svg className="w-6 h-6 md:w-7 md:h-7 text-black ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-            )}
-          </button>
-
-          <button onClick={next} className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center transition-all active:scale-90 border border-white/[0.04]" title="Next">
-            <svg className="w-4 h-4 md:w-5 md:h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM5.5 6l8.5 6-8.5 6z" /></svg>
-          </button>
-
-          <button onClick={toggleRepeat} className={`transition-all duration-300 active:scale-90 ${repeat !== 'off' ? 'text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.3)]' : 'text-zinc-500 hover:text-white'}`} title={`Repeat: ${repeat}`}>
-            <div className="relative">
-              <svg className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
-              </svg>
-              {repeat === 'one' && <span className="absolute -top-1 -right-1 text-[7px] md:text-[8px] font-bold text-[#D4AF37]">1</span>}
-            </div>
-          </button>
-        </div>
-
-        {/* Volume */}
-        <div className="w-full flex items-center gap-3 mb-5 max-w-sm mx-auto">
-          <svg className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
-          </svg>
-          <div className="flex-1 relative h-1 rounded-full bg-white/[0.06] overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-zinc-400 to-white transition-all duration-200" style={{ width: `${volume * 100}%` }} />
-            <input type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-          </div>
-          <svg className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.531v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
-          </svg>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 md:gap-3 mb-5 flex-wrap justify-center">
-          <button onClick={() => setShowEq(!showEq)} className={`px-4 py-2.5 rounded-xl text-[10px] md:text-xs transition-all flex items-center gap-1.5 active:scale-95 font-medium tracking-wider uppercase ${showEq ? 'glass-card text-[#D4AF37] border-[#D4AF37]/30' : 'bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200 border border-white/[0.04]'}`}>
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
-            </svg>
-            EQ
-          </button>
-          <button onClick={() => setShowSfx(!showSfx)} className={`px-4 py-2.5 rounded-xl text-[10px] md:text-xs transition-all flex items-center gap-1.5 active:scale-95 font-medium tracking-wider uppercase ${showSfx ? 'glass-card text-[#D4AF37] border-[#D4AF37]/30' : 'bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200 border border-white/[0.04]'}`}>
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
-            </svg>
-            FX
-          </button>
-          <button onClick={() => downloadCurrentTrack()} disabled={downloading} className="px-4 py-2.5 rounded-xl text-[10px] md:text-xs bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 font-medium tracking-wider uppercase border border-white/[0.04]">
-            {downloading ? (
-              <div className="w-3.5 h-3.5 rounded-full border border-[#D4AF37]/30 border-t-[#D4AF37] animate-spin" />
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-            )}
-            {downloading ? 'Saving...' : 'Download'}
-          </button>
-          {currentTrack.youtubeId && (
-            <div className="flex items-center gap-1.5 bg-white/[0.03] px-3 py-2 rounded-xl border border-white/[0.04]">
-              <span className="text-[9px] md:text-[10px] text-zinc-600 uppercase tracking-wider">Quality</span>
-              {['low', 'mid', 'high'].map(q => (
-                <button key={q} onClick={() => setAudioQuality(q)} className={`px-2 py-1 rounded-md text-[9px] md:text-[10px] uppercase tracking-wider transition-all font-medium ${audioQuality === q ? 'bg-[#D4AF37]/20 text-[#D4AF37]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'}`}>
-                  {q === 'high' ? 'HD' : q === 'mid' ? 'SD' : 'Low'}
-                </button>
+            <div className="flex items-end gap-1.5 h-24">
+              {[60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000].map((f, i) => (
+                <div key={f} className="flex-1 flex flex-col items-center gap-1">
+                  <div className={`w-full rounded-full bg-primary/30 transition-all duration-300`}
+                    style={{ height: `${30 + Math.sin(i * 1.2 + Date.now() * 0.001) * 30}%` }} />
+                  <span className="text-[6px] text-zinc-600">{f >= 1000 ? `${f / 1000}k` : f}</span>
+                </div>
               ))}
             </div>
-          )}
-        </div>
-
-        {/* EQ panel */}
-        {showEq && (
-          <div className="w-full fade-in mb-5">
-            <Equalizer />
           </div>
         )}
-
-        {/* FX panel */}
         {showSfx && (
-          <div className="w-full glass-panel rounded-2xl p-5 md:p-6 fade-in mb-5">
-            <h3 className="text-sm font-[family-name:var(--font-serif)] text-white uppercase tracking-wider mb-5 flex items-center gap-2">
-              <svg className="w-4 h-4 text-[#D4AF37]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
-              </svg>
-              Sound Effects
-            </h3>
-            <div className="space-y-5">
+          <div className="bg-[#1c1b1b]/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl p-5 mb-3 fade-in">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs text-zinc-400 uppercase tracking-wider">Sound Effects</h3>
+              <button onClick={() => setShowSfx(false)} className="text-zinc-500 hover:text-white">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            <div className="space-y-3">
               {[
-                { key: 'surround3D', label: '3D Surround', icon: '○' },
-                { key: 'bassBoost', label: 'Bass Boost', icon: '⌇' },
-                { key: 'reverb', label: 'Reverb', icon: '≈' },
-                { key: 'vocalBoost', label: 'Vocal Boost', icon: '♪' },
+                { key: 'surround3D', label: '3D Surround' },
+                { key: 'bassBoost', label: 'Bass Boost' },
+                { key: 'reverb', label: 'Reverb' },
+                { key: 'vocalBoost', label: 'Vocal Boost' },
               ].map(({ key, label }) => (
                 <div key={key}>
-                  <div className="flex justify-between text-xs mb-2">
+                  <div className="flex justify-between text-xs mb-1">
                     <span className="text-zinc-400">{label}</span>
                     <span className="text-zinc-600 font-mono text-[10px]">{(soundEffects as any)[key]}%</span>
                   </div>
-                  <div className="relative h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#D4AF37]/60 to-[#FFD700] transition-all duration-200" style={{ width: `${(soundEffects as any)[key]}%` }} />
+                  <div className="relative h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div className="h-full rounded-full bg-primary/60 transition-all duration-200" style={{ width: `${(soundEffects as any)[key]}%` }} />
                     <input type="range" min={0} max={100} value={(soundEffects as any)[key]} onChange={e => setSoundEffect(key, Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   </div>
                 </div>
               ))}
-              <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
+              <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
                 <span className="text-xs text-zinc-400">Night Mode</span>
-                <button onClick={() => setSoundEffect('nightMode', !soundEffects.nightMode)} className={`w-11 h-6 rounded-full transition-all relative ${soundEffects.nightMode ? 'bg-gradient-to-r from-[#D4AF37] to-[#FFD700]' : 'bg-zinc-700'}`}>
-                  <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all duration-300 shadow-md ${soundEffects.nightMode ? 'left-5.5' : 'left-0.5'}`} />
+                <button onClick={() => setSoundEffect('nightMode', !soundEffects.nightMode)}
+                  className={`w-10 h-5 rounded-full transition-all relative ${soundEffects.nightMode ? 'bg-primary' : 'bg-zinc-700'}`}>
+                  <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all duration-300 shadow-md ${soundEffects.nightMode ? 'left-5' : 'left-0.5'}`} />
                 </button>
               </div>
             </div>
           </div>
         )}
+      </div>
 
-        {/* Recommendations */}
-        <div className="w-full mt-2">
-          <Recommendations />
+      {/* Main content */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center pt-32 pb-48 px-container-padding-mobile space-y-8">
+        {/* Album Art with Progress Ring */}
+        <div className="relative flex items-center justify-center">
+          <svg className="absolute w-[310px] h-[310px] md:w-[410px] md:h-[410px]" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" fill="transparent" r="48" stroke="currentColor" strokeWidth="0.5" className="text-white/5" />
+            <circle className="progress-ring text-primary" cx="50" cy="50" fill="transparent" r="48" stroke="currentColor"
+              strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" strokeWidth="0.5" />
+          </svg>
+          <div className={`relative w-72 h-72 md:w-96 md:h-96 rounded-full overflow-hidden ring-1 ring-primary/20 shadow-[0_0_60px_rgba(0,0,0,0.8)] ${isPlaying ? 'animate-spin-slow' : ''}`}
+            style={{ animationDuration: '8s', animationTimingFunction: 'linear', animationIterationCount: 'infinite', animationPlayState: isPlaying ? 'running' : 'paused' }}>
+            {artSrc ? (
+              <img src={artSrc} alt="" className="w-full h-full object-cover scale-105" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+                <span className="material-symbols-outlined text-6xl text-zinc-700">music_note</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Queue */}
-        {queue.length > 1 && (
-          <div className="w-full mt-6 glass-panel rounded-2xl p-5">
-            <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
-              </svg>
-              Up Next ({queue.length} tracks)
-            </h3>
-            <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
-              {queue.map((track, i) => (
-                <div key={`${track.source || 'queue'}-${track.id}`} className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
-                  i === queueIndex ? 'bg-gradient-to-r from-[#D4AF37]/8 to-transparent border border-[#D4AF37]/15' : 'hover:bg-white/[0.02] border border-transparent'
+        {/* Track Info */}
+        <div className="text-center space-y-2">
+          <h2 className="font-display-lg-mobile text-[32px] md:text-[56px] gold-gradient-text tracking-[0.05em] italic leading-tight">
+            {currentTrack.title}
+          </h2>
+          <p className="text-primary font-body-md text-body-md small-caps tracking-[0.4em] font-medium opacity-90">
+            {currentTrack.artist.name}
+          </p>
+        </div>
+
+        {/* Seek Bar */}
+        <div className="w-full max-w-sm space-y-3">
+          <div className="relative w-full h-[1px] bg-white/10">
+            <div className="absolute top-0 left-0 h-full bg-primary shadow-[0_0_8px_#f2ca50] transition-all duration-300" style={{ width: `${pct}%` }} />
+            <div className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-primary shadow-[0_0_12px_#f2ca50] transition-all duration-300" style={{ left: `${pct}%` }} />
+            <input type="range" min={0} max={duration || 1} value={progress} onChange={handleSeek}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+          </div>
+          <div className="flex justify-between text-[11px] font-label-sm tracking-widest text-on-surface/40 uppercase">
+            <span>{formatTime(progress)}</span>
+            <span>{formatTime(duration)}</span>
+          </div>
+        </div>
+
+        {/* Main Controls */}
+        <div className="flex items-center justify-between w-full max-w-sm px-2">
+          <button onClick={toggleShuffle} className={`transition-all duration-300 active:scale-90 ${shuffle ? 'text-primary drop-shadow-[0_0_8px_rgba(242,202,80,0.3)]' : 'text-on-surface/40 hover:text-primary'}`}>
+            <span className="material-symbols-outlined text-2xl">shuffle</span>
+          </button>
+          <div className="flex items-center space-x-8">
+            <button onClick={prev} className="text-on-surface active:scale-90 transition-transform">
+              <span className="material-symbols-outlined text-[36px] font-light">skip_previous</span>
+            </button>
+            <button onClick={() => (isPlaying ? pause() : resume())}
+              className="w-20 h-20 rounded-full sunburst-btn flex items-center justify-center text-on-primary active:scale-95 transition-all">
+              <span className="material-symbols-outlined text-[44px] font-light" style={{ fontVariationSettings: "'FILL' 1" }}>
+                {isPlaying ? 'pause' : 'play_arrow'}
+              </span>
+            </button>
+            <button onClick={next} className="text-on-surface active:scale-90 transition-transform">
+              <span className="material-symbols-outlined text-[36px] font-light">skip_next</span>
+            </button>
+          </div>
+          <button onClick={toggleRepeat} className={`transition-all duration-300 active:scale-90 relative ${repeat !== 'off' ? 'text-primary drop-shadow-[0_0_8px_rgba(242,202,80,0.3)]' : 'text-on-surface/40 hover:text-primary'}`}>
+            <span className="material-symbols-outlined text-2xl">repeat</span>
+            {repeat === 'one' && <span className="absolute -top-1 -right-1 text-[9px] font-bold text-primary">1</span>}
+          </button>
+        </div>
+      </main>
+
+      {/* Frosted Obsidian Bottom Sheet */}
+      <div className={`fixed bottom-0 left-0 w-full z-40 frosted-obsidian rounded-t-[3rem] px-gutter pt-5 pb-12 transition-all duration-500 ${sheetOpen ? 'max-h-[70vh]' : 'max-h-[180px]'}`}>
+        <div className="flex flex-col items-center">
+          <button onClick={() => setSheetOpen(!sheetOpen)} className="w-12 h-1 bg-primary/30 rounded-full mb-4 hover:bg-primary/50 transition-colors" />
+
+          {/* Tabs */}
+          <div className="flex items-center gap-4 mb-4">
+            {(['lyrics', 'queue', 'controls'] as const).map(mode => (
+              <button key={mode} onClick={() => setSheetMode(mode)}
+                className={`text-[10px] uppercase tracking-[0.2em] transition-all pb-1 ${
+                  sheetMode === mode ? 'text-primary border-b border-primary' : 'text-zinc-500 hover:text-zinc-300'
                 }`}>
+                {mode === 'lyrics' ? 'Lyrics' : mode === 'queue' ? 'Up Next' : 'Extras'}
+              </button>
+            ))}
+          </div>
+
+          {/* Lyrics */}
+          {sheetMode === 'lyrics' && (
+            <div className="text-center space-y-3 w-full max-w-md">
+              <p className="text-on-surface font-body-lg text-body-lg opacity-90 italic leading-relaxed">
+                Midnight whispers in the rain...
+              </p>
+              <p className="text-on-surface/30 font-body-md text-body-md leading-relaxed">
+                Golden lights are fading in the dark...
+              </p>
+              <button className="flex items-center justify-center space-x-2 text-primary font-label-sm text-label-sm uppercase tracking-[0.2em] hover:brightness-110 mx-auto mt-2">
+                <span className="material-symbols-outlined text-lg">lyrics</span>
+                <span>Full Lyrics</span>
+              </button>
+            </div>
+          )}
+
+          {/* Queue */}
+          {sheetMode === 'queue' && queue.length > 1 && (
+            <div className="w-full max-w-md max-h-48 overflow-y-auto custom-scrollbar space-y-1">
+              {queue.map((track, i) => (
+                <div key={`${track.source || 'queue'}-${track.id}`}
+                  className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
+                    i === queueIndex ? 'bg-primary/8 border border-primary/15' : 'hover:bg-white/[0.03] border border-transparent'
+                  }`}>
                   <span className="w-5 text-center text-xs text-zinc-600 font-mono">{i + 1}</span>
                   {(() => {
                     const src = track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/default.jpg` : (track.album.cover_small || track.album.cover_medium);
                     return src ? (
-                      <img src={src} alt="" className="w-9 h-9 rounded-lg object-cover ring-1 ring-white/[0.05]" />
+                      <img src={src} alt="" className="w-8 h-8 rounded-lg object-cover ring-1 ring-white/[0.05]" />
                     ) : (
-                      <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center"><svg className="w-4 h-4 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377" /></svg></div>
+                      <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-sm text-zinc-600">music_note</span>
+                      </div>
                     );
                   })()}
                   <div className="min-w-0 flex-1">
-                    <p className={`text-xs font-medium truncate ${i === queueIndex ? 'text-[#D4AF37]' : 'text-zinc-300'}`}>{track.title}</p>
+                    <p className={`text-xs font-medium truncate ${i === queueIndex ? 'text-primary' : 'text-zinc-300'}`}>{track.title}</p>
                     <p className="text-[10px] text-zinc-600 truncate">{track.artist.name}</p>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Controls */}
+          {sheetMode === 'controls' && (
+            <div className="w-full max-w-md space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-lg text-zinc-500">volume_up</span>
+                <div className="flex-1 relative h-1 rounded-full bg-white/[0.08] overflow-hidden">
+                  <div className="h-full rounded-full bg-primary/60 transition-all duration-200" style={{ width: `${volume * 100}%` }} />
+                  <input type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                </div>
+                <span className="text-[10px] text-zinc-500 w-6 text-right font-mono">{Math.round(volume * 100)}%</span>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <button onClick={() => setShowEq(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200 transition-all uppercase tracking-wider">
+                  <span className="material-symbols-outlined text-lg">tune</span>
+                  EQ
+                </button>
+                <button onClick={() => setShowSfx(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200 transition-all uppercase tracking-wider">
+                  <span className="material-symbols-outlined text-lg">graphic_eq</span>
+                  FX
+                </button>
+                <button onClick={() => downloadCurrentTrack()} disabled={downloading} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200 transition-all disabled:opacity-40 uppercase tracking-wider">
+                  {downloading ? (
+                    <div className="w-3.5 h-3.5 rounded-full border border-primary/30 border-t-primary animate-spin" />
+                  ) : (
+                    <span className="material-symbols-outlined text-lg">download</span>
+                  )}
+                  {downloading ? 'Saving...' : 'Download'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Airplay / Output button */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <button className="w-12 h-12 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center text-on-surface/60 hover:text-primary transition-colors">
+          <span className="material-symbols-outlined text-xl">airplay</span>
+        </button>
       </div>
     </div>
   );

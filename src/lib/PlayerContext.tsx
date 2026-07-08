@@ -478,12 +478,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const clearQueue = useCallback(() => setState(s => ({ ...s, queue: [], queueIndex: -1 })), []);
 
   // ── Download ──────────────────────────────────────────────────
+  function triggerDownload(url: string, filename: string) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   const downloadCurrentTrack = useCallback(async () => {
     const t = sRef.current.currentTrack;
     if (!t) return;
     if (t.youtubeId) {
       setDownloading(true);
-      window.location.href = `/api/download?id=${t.youtubeId}&title=${encodeURIComponent(t.title)}`;
+      triggerDownload(
+        `/api/download?id=${t.youtubeId}&title=${encodeURIComponent(t.title)}`,
+        `${t.title.replace(/[^\w\s]/g, '').trim() || 'song'}.m4a`,
+      );
       setTimeout(() => setDownloading(false), 5000);
       return;
     }
@@ -492,13 +504,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch(t.preview, { signal: AbortSignal.timeout(30000) });
       const blob = await res.blob();
-      const ext = blob.type.includes('mp4') ? 'mp3' : 'mp3';
+      const ext = blob.type.includes('mp4') ? 'm4a' : 'mp3';
+      const objUrl = URL.createObjectURL(blob);
       const fn = `${t.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.${ext}`;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = fn;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      triggerDownload(objUrl, fn);
+      setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
     } catch { window.open(t.preview, '_blank'); }
     setDownloading(false);
   }, []);

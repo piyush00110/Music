@@ -33,7 +33,10 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${playfair.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#0f0f0f] text-[#e5e2e1]">
+      <head>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
+      </head>
+      <body className="min-h-full flex flex-col bg-[#050505] text-[#e5e2e1]">
         <SearchProvider>
         <PlayerProvider>
           <Header />
