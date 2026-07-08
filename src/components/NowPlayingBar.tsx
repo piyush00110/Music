@@ -20,7 +20,7 @@ export default function NowPlayingBar() {
     : currentTrack.album.cover_medium;
 
   return (
-    <div className="fixed bottom-14 md:bottom-0 left-0 right-0 z-40 frosted-obsidian">
+    <div className="fixed bottom-[52px] md:bottom-0 left-0 right-0 z-40 frosted-obsidian">
       {audioError && (
         <div className="absolute -top-5 left-0 right-0 text-center z-50">
           <span className="text-[10px] text-red-400 bg-black/80 px-3 py-1 rounded-full backdrop-blur-md border border-red-500/10">{audioError}</span>
@@ -29,14 +29,14 @@ export default function NowPlayingBar() {
 
       {/* Mobile */}
       <div className="md:hidden">
-        <div className="flex items-center gap-2.5 px-3 py-2">
-          <Link href="/player" className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="relative w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800 shadow-lg">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <Link href="/player" className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800 shadow-md">
               {artSrc ? (
                 <img src={artSrc} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="material-symbols-outlined text-zinc-600">music_note</span>
+                  <span className="material-symbols-outlined text-zinc-600 text-sm">music_note</span>
                 </div>
               )}
               {isPlaying && (
@@ -44,31 +44,31 @@ export default function NowPlayingBar() {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-white truncate">{currentTrack.title}</p>
-              <p className="text-[11px] text-zinc-400 truncate">{currentTrack.artist.name}</p>
+              <p className="text-[12px] font-medium text-white truncate">{currentTrack.title}</p>
+              <p className="text-[10px] text-zinc-400 truncate">{currentTrack.artist.name}</p>
             </div>
           </Link>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={prev} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 text-zinc-300">
-              <span className="material-symbols-outlined text-[20px]">skip_previous</span>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <button onClick={prev} className="w-7 h-7 rounded-full flex items-center justify-center active:scale-90 text-zinc-300">
+              <span className="material-symbols-outlined text-[18px]">skip_previous</span>
             </button>
             <button onClick={() => (isPlaying ? pause() : resume())}
-              className="w-10 h-10 rounded-full sunburst-btn flex items-center justify-center text-black active:scale-90 transition-all">
-              <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              className="w-9 h-9 rounded-full sunburst-btn flex items-center justify-center text-black active:scale-90 transition-all">
+              <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                 {isPlaying ? 'pause' : 'play_arrow'}
               </span>
             </button>
-            <button onClick={next} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 text-zinc-300">
-              <span className="material-symbols-outlined text-[20px]">skip_next</span>
+            <button onClick={next} className="w-7 h-7 rounded-full flex items-center justify-center active:scale-90 text-zinc-300">
+              <span className="material-symbols-outlined text-[18px]">skip_next</span>
             </button>
           </div>
         </div>
-        <div className="px-3 pb-2">
+        <div className="px-3 pb-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-[9px] text-zinc-600 tabular-nums w-6">{formatTime(progress)}</span>
+            <span className="text-[8px] text-zinc-600 tabular-nums w-6">{formatTime(progress)}</span>
             <div className="flex-1"><ProgressBar value={progress} max={duration} /></div>
-            <span className="text-[9px] text-zinc-600 tabular-nums w-6 text-right">{formatTime(duration)}</span>
+            <span className="text-[8px] text-zinc-600 tabular-nums w-6 text-right">{formatTime(duration)}</span>
           </div>
         </div>
       </div>

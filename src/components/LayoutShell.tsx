@@ -12,11 +12,15 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   return (
     <>
       {!isPlayer && <Header />}
-      <main className={`flex-1 ${isPlayer ? '' : 'pt-16 pb-28 md:pb-20'}`}>
+      <main className={`flex-1 ${isPlayer ? '' : 'pt-16 pb-40 md:pb-24'}`}>
         {children}
       </main>
-      {!isPlayer && <NowPlayingBar />}
-      {!isPlayer && <BottomNav />}
+      {!isPlayer && (
+        <>
+          <NowPlayingBar />
+          <BottomNav />
+        </>
+      )}
     </>
   );
 }
