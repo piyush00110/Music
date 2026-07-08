@@ -482,7 +482,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const t = sRef.current.currentTrack;
     if (!t) return;
     if (t.youtubeId) {
-      window.open(`/api/download?id=${t.youtubeId}&title=${encodeURIComponent(t.title)}`, '_blank');
+      setDownloading(true);
+      window.location.href = `/api/download?id=${t.youtubeId}&title=${encodeURIComponent(t.title)}`;
+      setTimeout(() => setDownloading(false), 5000);
       return;
     }
     if (!t.preview) return;
@@ -490,7 +492,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch(t.preview, { signal: AbortSignal.timeout(30000) });
       const blob = await res.blob();
-      const fn = `${t.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.mp3`;
+      const ext = blob.type.includes('mp4') ? 'mp3' : 'mp3';
+      const fn = `${t.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.${ext}`;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = fn;

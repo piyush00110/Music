@@ -115,7 +115,13 @@ export default function NowPlayingBar() {
           {currentTrack.youtubeId && (
             <a href={`https://www.youtube.com/watch?v=${currentTrack.youtubeId}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-500 hover:text-[#D4AF37] transition-colors" title="Open in YouTube">YouTube</a>
           )}
-          <button onClick={() => downloadCurrentTrack()} disabled={downloading} className="text-zinc-400 hover:text-[#D4AF37] transition-colors disabled:opacity-50" title="Download">
+          <button onClick={() => {
+            if (currentTrack.youtubeId) {
+              window.location.href = `/api/download?id=${currentTrack.youtubeId}&title=${encodeURIComponent(currentTrack.title)}`;
+            } else {
+              downloadCurrentTrack();
+            }
+          }} disabled={downloading} className="text-zinc-400 hover:text-[#D4AF37] transition-colors disabled:opacity-50" title="Download">
             {downloading ? (
               <div className="w-4 h-4 rounded-full border border-[#D4AF37]/30 border-t-[#D4AF37] animate-spin" />
             ) : (

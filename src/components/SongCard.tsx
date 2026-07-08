@@ -19,7 +19,9 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
   const downloadTrack = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (track.youtubeId) {
-      window.open(`/api/download?id=${track.youtubeId}&title=${encodeURIComponent(track.title)}`, '_blank');
+      setDl(true);
+      window.location.href = `/api/download?id=${track.youtubeId}&title=${encodeURIComponent(track.title)}`;
+      setTimeout(() => setDl(false), 3000);
       return;
     }
     const url = track.preview;
@@ -28,7 +30,8 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
       const blob = await res.blob();
-      const fn = `${track.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.mp3`;
+      const ext = blob.type.includes('mp4') || blob.type.includes('mpeg') ? 'mp3' : 'mp3';
+      const fn = `${track.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.${ext}`;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = fn;
