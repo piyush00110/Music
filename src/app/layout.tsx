@@ -36,14 +36,14 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
       </head>
-      <body className="min-h-full flex flex-col bg-[#050505] text-[#e5e2e1]">
+      <body className="min-h-full flex flex-col bg-[#050505] text-[#e5e2e1] noise-bg">
         <SearchProvider>
-        <PlayerProvider>
-          <Header />
-          <main className="flex-1 pt-18 pb-40 md:pb-24"><ErrorBoundary>{children}</ErrorBoundary></main>
-          <NowPlayingBar />
-          <BottomNav />
-        </PlayerProvider>
+          <PlayerProvider>
+            <Header />
+            <main className="flex-1 pt-16 pb-28 md:pb-20"><ErrorBoundary>{children}</ErrorBoundary></main>
+            <NowPlayingBar />
+            <BottomNav />
+          </PlayerProvider>
         </SearchProvider>
       </body>
     </html>
