@@ -3,27 +3,8 @@
 import { usePlayer } from '@/lib/PlayerContext';
 import Equalizer from '@/components/Equalizer';
 import EnhancedVisualizer from '@/components/EnhancedVisualizer';
-import Recommendations from '@/components/Recommendations';
 import Link from 'next/link';
 import { useState, useRef, useEffect, useCallback } from 'react';
-
-function extractColor(imgUrl: string): Promise<string> {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = 1; c.height = 1;
-      const ctx = c.getContext('2d');
-      if (!ctx) { resolve('#0a0a0f'); return; }
-      ctx.drawImage(img, 0, 0, 1, 1);
-      const d = ctx.getImageData(0, 0, 1, 1).data;
-      resolve(`rgb(${d[0]},${d[1]},${d[2]})`);
-    };
-    img.onerror = () => resolve('#0a0a0f');
-    img.src = imgUrl;
-  });
-}
 
 function formatTime(t: number) {
   const m = Math.floor(t / 60);
@@ -41,7 +22,6 @@ export default function PlayerPage() {
     downloadCurrentTrack, downloading,
     setSoundEffect,
   } = usePlayer();
-  const [bgColor, setBgColor] = useState('#0a0a0f');
   const [showQueue, setShowQueue] = useState(false);
   const [showEq, setShowEq] = useState(false);
   const [showFx, setShowFx] = useState(false);
@@ -51,15 +31,6 @@ export default function PlayerPage() {
   const [sleepTimer, setSleepTimer] = useState<number | null>(null);
   const [showSleepPicker, setShowSleepPicker] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (!currentTrack) return;
-    const src = currentTrack.youtubeId
-      ? `https://i.ytimg.com/vi/${currentTrack.youtubeId}/hqdefault.jpg`
-      : currentTrack.album.cover_medium;
-    if (src) extractColor(src).then(setBgColor);
-    else setBgColor('#0a0a0f');
-  }, [currentTrack?.youtubeId, currentTrack?.album.cover_medium]);
 
   useEffect(() => {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
@@ -109,8 +80,8 @@ export default function PlayerPage() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#0a0a0f]">
-      <div className="fixed inset-0 pointer-events-none transition-colors duration-1000" style={{ background: `radial-gradient(ellipse at 50% 0%, ${bgColor}80 0%, transparent 70%)` }} />
-      <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-transparent via-[#0a0a0f]/60 to-[#0a0a0f]" />
+      <div className="fixed inset-0 pointer-events-none" style={{ backgroundImage: `url(${artSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(40px) brightness(0.4)', opacity: 0.8 }} />
+      <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-transparent via-[#0a0a0f]/30 to-[#0a0a0f]" />
 
       {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between px-4 md:px-6 pt-12 pb-2">
@@ -242,10 +213,9 @@ export default function PlayerPage() {
         </div>
       )}
 
-      {/* Main content - responsive grid */}
-      <main className="relative z-10 flex-1 flex flex-col md:grid md:grid-cols-2 md:gap-6 px-4 md:px-6 pb-4 overflow-y-auto">
-        {/* Left column - Album + Info + Controls */}
-        <div className="flex flex-col items-center justify-center space-y-5 md:space-y-6 py-4">
+      {/* Main content */}
+      <main className="relative z-10 flex-1 flex flex-col items-center px-4 md:px-6 pb-4 overflow-y-auto">
+        <div className="flex flex-col items-center justify-center space-y-5 md:space-y-6 py-4 w-full max-w-lg mx-auto">
 
           {/* Album art */}
           <div className="relative w-64 h-64 md:w-72 md:h-72 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/[0.06]">
@@ -341,100 +311,7 @@ export default function PlayerPage() {
           </div>
         </div>
 
-        {/* Right column - Queue + Recommendations (desktop only) */}
-        <div className="hidden md:flex flex-col space-y-6 pt-4 overflow-y-auto max-h-[calc(100vh-12rem)]">
-          {/* Queue preview */}
-          {queue.length > 1 && (
-            <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/[0.04] rounded-2xl p-5">
-              <h3 className="text-xs text-zinc-500 uppercase tracking-wider font-medium mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg">queue_music</span>
-                Up Next
-              </h3>
-              <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
-                {queue.slice(queueIndex + 1, queueIndex + 8).map((track, i) => (
-                  <div key={`${track.source || 'queue'}-${track.id}`}
-                    className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] transition-all">
-                    {(() => {
-                      const src = track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/default.jpg` : (track.album.cover_small || track.album.cover_medium);
-                      return src ? (
-                        <img src={src} alt="" className="w-9 h-9 rounded-lg object-cover ring-1 ring-white/[0.04]" />
-                      ) : (
-                        <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-zinc-600">music_note</span>
-                        </div>
-                      );
-                    })()}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-zinc-300 truncate">{track.title}</p>
-                      <p className="text-[10px] text-zinc-600 truncate">{track.artist.name}</p>
-                    </div>
-                  </div>
-                ))}
-                {queue.length > 8 && (
-                  <button onClick={() => setShowQueue(true)} className="w-full text-center text-[10px] text-zinc-600 py-2 hover:text-zinc-400 transition-colors">
-                    +{queue.length - queueIndex - 8} more tracks
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Recommendations */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/[0.04] rounded-2xl p-5">
-            <h3 className="text-xs text-zinc-500 uppercase tracking-wider font-medium mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-lg">library_music</span>
-              Recommended
-            </h3>
-            <Recommendations />
-          </div>
-        </div>
       </main>
-
-      {/* Mobile bottom section - Queue + Recommendations */}
-      <div className="relative z-10 md:hidden px-4 pb-24 space-y-4">
-        {queue.length > 1 && (
-          <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/[0.04] rounded-2xl p-4">
-            <h3 className="text-xs text-zinc-500 uppercase tracking-wider font-medium mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-lg">queue_music</span>
-              Up Next
-            </h3>
-            <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
-              {queue.slice(queueIndex + 1, queueIndex + 5).map((track, i) => (
-                <div key={`${track.source || 'queue'}-${track.id}`}
-                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] transition-all">
-                  {(() => {
-                    const src = track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/default.jpg` : (track.album.cover_small || track.album.cover_medium);
-                    return src ? (
-                      <img src={src} alt="" className="w-9 h-9 rounded-lg object-cover ring-1 ring-white/[0.04]" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-zinc-600">music_note</span>
-                      </div>
-                    );
-                  })()}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-zinc-300 truncate">{track.title}</p>
-                    <p className="text-[10px] text-zinc-600 truncate">{track.artist.name}</p>
-                  </div>
-                </div>
-              ))}
-              {queue.length > 5 && (
-                <button onClick={() => setShowQueue(true)} className="w-full text-center text-[10px] text-zinc-600 py-2 hover:text-zinc-400 transition-colors">
-                  +{queue.length - queueIndex - 5} more
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="bg-zinc-900/50 backdrop-blur-xl border border-white/[0.04] rounded-2xl p-4">
-          <h3 className="text-xs text-zinc-500 uppercase tracking-wider font-medium mb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">library_music</span>
-            Recommended
-          </h3>
-          <Recommendations />
-        </div>
-      </div>
 
       {/* Lyrics overlay */}
       {showLyrics && (
