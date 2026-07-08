@@ -85,23 +85,14 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
         </span>
       )}
 
-      <div className="relative w-11 h-11 md:w-12 md:h-12 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800/50 shadow-md">
+      <div className="w-11 h-11 md:w-12 md:h-12 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800/50 shadow-md">
         {artSrc ? (
-          <img src={artSrc} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+          <img src={artSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="material-symbols-outlined text-zinc-600 text-lg">music_note</span>
           </div>
         )}
-        <div className="play-overlay absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-          <div className="w-8 h-8 rounded-full bg-[#D4AF37]/90 flex items-center justify-center shadow-lg shadow-[#D4AF37]/30">
-            {isCurrentTrack && isPlaying ? (
-              <span className="material-symbols-outlined text-black text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>pause</span>
-            ) : (
-              <span className="material-symbols-outlined text-black text-lg ml-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
-            )}
-          </div>
-        </div>
       </div>
 
       <div className="min-w-0 flex-1">
