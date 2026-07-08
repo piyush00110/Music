@@ -10,6 +10,38 @@ function formatTime(t: number) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+function extractColors(imgSrc: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(['#D4AF37']); return; }
+      canvas.width = 50;
+      canvas.height = 50;
+      ctx.drawImage(img, 0, 0, 50, 50);
+      const data = ctx.getImageData(0, 0, 50, 50).data;
+      const colors: Record<string, number> = {};
+      for (let i = 0; i < data.length; i += 16) {
+        const r = Math.round(data[i] / 32) * 32;
+        const g = Math.round(data[i + 1] / 32) * 32;
+        const b = Math.round(data[i + 2] / 32) * 32;
+        const key = `${r},${g},${b}`;
+        colors[key] = (colors[key] || 0) + 1;
+      }
+      const sorted = Object.entries(colors).sort((a, b) => b[1] - a[1]);
+      const result = sorted.slice(0, 3).map(([k]) => {
+        const [r, g, b] = k.split(',').map(Number);
+        return `rgb(${r},${g},${b})`;
+      });
+      resolve(result.length ? result : ['#D4AF37']);
+    };
+    img.onerror = () => resolve(['#D4AF37']);
+    img.src = imgSrc;
+  });
+}
+
 export default function PlayerPage() {
   const {
     currentTrack, isPlaying, queue, queueIndex,
@@ -25,10 +57,40 @@ export default function PlayerPage() {
   const [seeking, setSeeking] = useState(false);
   const [localPct, setLocalPct] = useState(0);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [dominantColor, setDominantColor] = useState('#D4AF37');
+  const [accentColor, setAccentColor] = useState('#FFBF00');
+  const [glowIntensity, setGlowIntensity] = useState(0.3);
   const progressRef = useRef<HTMLDivElement>(null);
 
   const pct = duration > 0 ? (progress / duration) * 100 : 0;
   const displayPct = seeking ? localPct : pct;
+
+  const artSrc = currentTrack?.youtubeId
+    ? `https://i.ytimg.com/vi/${currentTrack.youtubeId}/hqdefault.jpg`
+    : currentTrack?.album.cover_medium;
+
+  // Extract colors from album art
+  useEffect(() => {
+    if (!artSrc) return;
+    extractColors(artSrc).then(colors => {
+      setDominantColor(colors[0] || '#D4AF37');
+      setAccentColor(colors[1] || colors[0] || '#FFBF00');
+    });
+  }, [artSrc]);
+
+  // Glow pulses when playing
+  useEffect(() => {
+    if (!isPlaying) { setGlowIntensity(0.3); return; }
+    let frame: number;
+    let t = 0;
+    const animate = () => {
+      t += 0.02;
+      setGlowIntensity(0.3 + Math.sin(t) * 0.2);
+      frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [isPlaying]);
 
   const updateSeekPosition = useCallback((clientX: number) => {
     const rect = progressRef.current?.getBoundingClientRect();
@@ -93,22 +155,74 @@ export default function PlayerPage() {
     );
   }
 
-  const artSrc = currentTrack.youtubeId
-    ? `https://i.ytimg.com/vi/${currentTrack.youtubeId}/hqdefault.jpg`
-    : currentTrack.album.cover_medium;
-
   return (
-    <div className="relative min-h-screen flex flex-col bg-background overflow-hidden selection:bg-primary/30 font-body-md">
-      {/* Background layers */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-black/80 z-20" />
+    <div className="relative min-h-screen flex flex-col bg-black overflow-hidden selection:bg-primary/30 font-body-md">
+      <style jsx>{`
+        @keyframes album-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes wave-slow {
+          0% { transform: translateX(0) scaleY(1); }
+          50% { transform: translateX(-25%) scaleY(1.3); }
+          100% { transform: translateX(-50%) scaleY(1); }
+        }
+        @keyframes wave-slow-2 {
+          0% { transform: translateX(0) scaleY(1); }
+          50% { transform: translateX(25%) scaleY(0.7); }
+          100% { transform: translateX(50%) scaleY(1); }
+        }
+        @keyframes glow-pulse {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.7; }
+        }
+        @keyframes ring-spin {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        @keyframes ring-spin-reverse {
+          from { transform: translate(-50%, -50%) rotate(360deg); }
+          to { transform: translate(-50%, -50%) rotate(0deg); }
+        }
+      `}</style>
+
+      {/* === BACKGROUND LAYERS === */}
+      <div className="fixed inset-0 z-0 bg-black">
+        {/* Blurred album art background */}
         {artSrc && (
-          <div className="absolute inset-0 bg-cover bg-center z-10 opacity-40 blur-2xl scale-110" style={{ backgroundImage: `url(${artSrc})` }} />
+          <div className="absolute inset-0 opacity-40 blur-3xl scale-125"
+            style={{ backgroundImage: `url(${artSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
         )}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#D4AF37]/[0.04] blur-[120px] rounded-full animate-pulse-slow z-15" />
-        <div className="absolute inset-0 z-[21] pointer-events-none" style={{
-          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.5) 100%)'
-        }} />
+        <div className="absolute inset-0 bg-black/60" />
+
+        {/* Slow wave forms */}
+        <div className="absolute bottom-0 left-0 w-[200%] h-40 opacity-[0.06] pointer-events-none"
+          style={{
+            background: `repeating-linear-gradient(90deg, transparent, transparent 40px, ${dominantColor} 40px, ${dominantColor} 42px)`,
+            animation: 'wave-slow 12s ease-in-out infinite',
+          }} />
+        <div className="absolute bottom-10 left-0 w-[200%] h-32 opacity-[0.04] pointer-events-none"
+          style={{
+            background: `repeating-linear-gradient(90deg, transparent, transparent 60px, ${accentColor} 60px, ${accentColor} 61px)`,
+            animation: 'wave-slow-2 16s ease-in-out infinite',
+          }} />
+        <div className="absolute top-1/3 left-0 w-[200%] h-20 opacity-[0.03] pointer-events-none"
+          style={{
+            background: `repeating-linear-gradient(90deg, transparent, transparent 80px, ${dominantColor} 80px, ${dominantColor} 81px)`,
+            animation: 'wave-slow 20s ease-in-out infinite reverse',
+          }} />
+
+        {/* Ambient glow from album color */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full pointer-events-none transition-all duration-1000"
+          style={{
+            background: `radial-gradient(circle, ${dominantColor}20 0%, transparent 70%)`,
+            opacity: glowIntensity,
+            filter: 'blur(80px)',
+          }} />
+
+        {/* Vignette */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 100%)' }} />
       </div>
 
       {/* Header */}
@@ -122,7 +236,7 @@ export default function PlayerPage() {
         </button>
       </header>
 
-      {/* Menu overlay */}
+      {/* Menu */}
       {showMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
@@ -150,39 +264,78 @@ export default function PlayerPage() {
 
       {/* Main content */}
       <main className="relative z-30 flex flex-col flex-1 px-6 md:px-10 pt-20 pb-8">
-        {/* Album Art */}
+        {/* Album Art with lighting ring */}
         <div className="flex-1 flex items-center justify-center relative py-4">
-          {/* Visualizer bars */}
-          <div className="absolute inset-0 flex items-center justify-center gap-[3px] opacity-15 pointer-events-none">
-            {[0.1, 0.3, 0.5, 0.2, 0.4, 0.6].map((d, i) => (
-              <div key={i} className="w-[3px] bg-gradient-to-t from-[#D4AF37]/40 to-[#D4AF37] rounded-full animate-pulse-slow"
-                style={{ animationDelay: `${d}s`, height: `${25 + i * 10}%` }} />
+          {/* Spinning light ring behind art */}
+          {isPlaying && (
+            <>
+              <div className="absolute w-[300px] md:w-[340px] h-[300px] md:h-[340px] rounded-full pointer-events-none"
+                style={{
+                  border: `2px solid ${dominantColor}15`,
+                  borderTop: `2px solid ${dominantColor}60`,
+                  borderRight: `2px solid ${dominantColor}20`,
+                  animation: 'ring-spin 4s linear infinite',
+                  top: '50%', left: '50%',
+                }} />
+              <div className="absolute w-[320px] md:w-[360px] h-[320px] md:h-[360px] rounded-full pointer-events-none"
+                style={{
+                  border: `1px solid ${accentColor}10`,
+                  borderBottom: `1px solid ${accentColor}40`,
+                  animation: 'ring-spin-reverse 6s linear infinite',
+                  top: '50%', left: '50%',
+                }} />
+            </>
+          )}
+
+          {/* Waveform bars behind art */}
+          <div className="absolute inset-0 flex items-center justify-center gap-[3px] pointer-events-none">
+            {[0.1, 0.3, 0.5, 0.2, 0.4, 0.6, 0.15, 0.35].map((d, i) => (
+              <div key={i}
+                className="w-[3px] rounded-full transition-all duration-300"
+                style={{
+                  height: isPlaying ? `${20 + Math.sin(Date.now() * 0.001 + i) * 30 + 20}%` : '15%',
+                  background: `linear-gradient(to top, ${dominantColor}30, ${dominantColor})`,
+                  opacity: isPlaying ? 0.25 : 0.08,
+                  animation: isPlaying ? `bar-grow 1.2s ease-in-out ${d}s infinite` : 'none',
+                }} />
             ))}
           </div>
 
-          <div className="w-full max-w-[260px] md:max-w-[300px] aspect-square rounded-2xl overflow-hidden relative group"
-            style={{
-              boxShadow: isPlaying
-                ? '0 25px 60px rgba(0,0,0,0.6), 0 0 80px rgba(212,175,55,0.12)'
-                : '0 20px 50px rgba(0,0,0,0.5), 0 0 40px rgba(212,175,55,0.06)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              animation: isPlaying ? 'album-float 6s ease-in-out infinite' : 'none',
-            }}>
-            {artSrc ? (
-              <img src={artSrc} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-zinc-800/50">
-                <span className="material-symbols-outlined text-6xl text-zinc-700">music_note</span>
-              </div>
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-            {isPlaying && (
-              <div className="absolute bottom-3 right-3 flex items-center gap-[3px] bg-black/50 backdrop-blur-md rounded-full px-2.5 py-1.5 border border-white/[0.06]">
-                {[2, 3, 2].map((h, i) => (
-                  <div key={i} className="w-[3px] rounded-full bg-[#D4AF37] animate-pulse-slow" style={{ height: `${h * 4}px`, animationDelay: `${i * 0.15}s` }} />
-                ))}
-              </div>
-            )}
+          {/* Album Art */}
+          <div className="relative"
+            style={{ animation: isPlaying ? 'album-float 6s ease-in-out infinite' : 'none' }}>
+            {/* Ambient glow under art */}
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-[80%] h-16 rounded-full pointer-events-none transition-all duration-1000"
+              style={{
+                background: dominantColor,
+                filter: 'blur(40px)',
+                opacity: glowIntensity * 0.5,
+              }} />
+
+            <div className="w-[240px] h-[240px] md:w-[280px] md:h-[280px] rounded-2xl overflow-hidden relative group"
+              style={{
+                boxShadow: isPlaying
+                  ? `0 25px 60px rgba(0,0,0,0.6), 0 0 80px ${dominantColor}25`
+                  : '0 20px 50px rgba(0,0,0,0.5)',
+                border: `1px solid ${isPlaying ? dominantColor + '30' : 'rgba(255,255,255,0.06)'}`,
+              }}>
+              {artSrc ? (
+                <img src={artSrc} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-zinc-800/50">
+                  <span className="material-symbols-outlined text-6xl text-zinc-700">music_note</span>
+                </div>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+              {/* Playing indicator */}
+              {isPlaying && (
+                <div className="absolute bottom-3 right-3 flex items-center gap-[3px] bg-black/50 backdrop-blur-md rounded-full px-2.5 py-1.5 border border-white/[0.06]">
+                  {[2, 3, 2].map((h, i) => (
+                    <div key={i} className="w-[3px] rounded-full animate-pulse-slow" style={{ height: `${h * 4}px`, backgroundColor: dominantColor, animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -190,14 +343,15 @@ export default function PlayerPage() {
         <div className="flex items-end justify-between mt-5">
           <div className="min-w-0 flex-1 pr-4">
             <h1 className="font-headline-md text-white tracking-tight leading-tight text-2xl md:text-3xl truncate">{currentTrack.title}</h1>
-            <p className="text-[#D4AF37]/60 uppercase tracking-[0.25em] text-[11px] mt-1.5 font-bold">{currentTrack.artist.name}</p>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#D4AF37]/[0.08] border border-[#D4AF37]/20 mt-2">
-              <span className="material-symbols-outlined text-[12px] text-[#D4AF37]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
-              <span className="text-[9px] font-bold text-[#D4AF37]/80 tracking-[0.1em] uppercase">Master Quality • 24-bit / 192kHz</span>
+            <p className="uppercase tracking-[0.25em] text-[11px] mt-1.5 font-bold" style={{ color: `${dominantColor}99` }}>{currentTrack.artist.name}</p>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mt-2"
+              style={{ backgroundColor: `${dominantColor}12`, border: `1px solid ${dominantColor}30` }}>
+              <span className="material-symbols-outlined text-[12px]" style={{ color: dominantColor, fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+              <span className="text-[9px] font-bold tracking-[0.1em] uppercase" style={{ color: `${dominantColor}CC` }}>Master Quality • 24-bit / 192kHz</span>
             </div>
           </div>
           <button className="w-12 h-12 rounded-full bg-white/5 border border-white/[0.06] flex items-center justify-center active:scale-90 transition-all hover:bg-white/10 flex-shrink-0">
-            <span className="material-symbols-outlined text-[24px] text-[#D4AF37]" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+            <span className="material-symbols-outlined text-[24px]" style={{ color: dominantColor, fontVariationSettings: "'FILL' 1" }}>favorite</span>
           </button>
         </div>
 
@@ -206,13 +360,14 @@ export default function PlayerPage() {
           <div ref={progressRef} className="relative w-full h-1 cursor-pointer group rounded-full"
             onMouseDown={handleSeekStart} onTouchStart={handleSeekStart}>
             <div className="absolute inset-0 rounded-full bg-white/[0.06]" />
-            <div className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFBF00] transition-all duration-100" style={{ width: `${displayPct}%` }} />
-            <div className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-[0_0_12px_rgba(242,202,80,0.6)] transition-all duration-100 ${seeking ? 'scale-125 opacity-100' : 'scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100'}`}
+            <div className="absolute top-0 left-0 h-full rounded-full transition-all duration-100"
+              style={{ width: `${displayPct}%`, background: `linear-gradient(90deg, ${dominantColor}, ${accentColor})` }} />
+            <div className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.4)] transition-all duration-100 ${seeking ? 'scale-125 opacity-100' : 'scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100'}`}
               style={{ left: `${displayPct}%` }} />
             {showTooltip && (
               <div className="absolute -top-10 -translate-x-1/2 glass-card rounded-lg px-2.5 py-1 shadow-xl pointer-events-none scale-in"
                 style={{ left: `${displayPct}%` }}>
-                <span className="text-[11px] text-[#D4AF37] font-mono font-medium">{formatTime((localPct / 100) * duration)}</span>
+                <span className="text-[11px] font-mono font-medium" style={{ color: dominantColor }}>{formatTime((localPct / 100) * duration)}</span>
               </div>
             )}
           </div>
@@ -226,8 +381,9 @@ export default function PlayerPage() {
         <div className="flex items-center justify-between mt-7">
           <button onClick={toggleShuffle}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 active:scale-90 ${
-              shuffle ? 'text-[#D4AF37] bg-[#D4AF37]/10' : 'text-zinc-400 hover:text-white hover:bg-white/5'
-            }`}>
+              shuffle ? 'bg-white/10' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+            }`}
+            style={shuffle ? { color: dominantColor } : undefined}>
             <span className="material-symbols-outlined text-[22px]">shuffle</span>
           </button>
 
@@ -238,7 +394,13 @@ export default function PlayerPage() {
             </button>
 
             <button onClick={() => (isPlaying ? pause() : resume())}
-              className="w-[72px] h-[72px] md:w-20 md:h-20 rounded-full flex items-center justify-center active:scale-90 transition-all duration-300 sunburst-btn">
+              className="w-[72px] h-[72px] md:w-20 md:h-20 rounded-full flex items-center justify-center active:scale-90 transition-all duration-300"
+              style={{
+                background: `radial-gradient(circle, ${dominantColor} 0%, ${dominantColor}CC 100%)`,
+                boxShadow: isPlaying
+                  ? `0 0 40px ${dominantColor}60, 0 0 80px ${dominantColor}20`
+                  : `0 0 25px ${dominantColor}40`,
+              }}>
               <span className="material-symbols-outlined text-[40px] md:text-[44px] text-black" style={{ fontVariationSettings: "'FILL' 1" }}>
                 {isPlaying ? 'pause' : 'play_arrow'}
               </span>
@@ -252,27 +414,29 @@ export default function PlayerPage() {
 
           <button onClick={toggleRepeat}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 active:scale-90 relative ${
-              repeat !== 'off' ? 'text-[#D4AF37] bg-[#D4AF37]/10' : 'text-zinc-400 hover:text-white hover:bg-white/5'
-            }`}>
+              repeat !== 'off' ? 'bg-white/10' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+            }`}
+            style={repeat !== 'off' ? { color: dominantColor } : undefined}>
             <span className="material-symbols-outlined text-[22px]">repeat</span>
-            {repeat === 'one' && <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold text-[#D4AF37]">1</span>}
+            {repeat === 'one' && <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold" style={{ color: dominantColor }}>1</span>}
           </button>
         </div>
 
         {/* Bottom actions */}
         <div className="flex items-center justify-between mt-7">
           <button onClick={() => setDrawerOpen(true)}
-            className="flex items-center gap-2.5 px-4 py-2 rounded-full glass-btn active:scale-95 transition-all duration-300 hover:bg-white/[0.08] hover:border-[#D4AF37]/20">
-            <span className="material-symbols-outlined text-[18px] text-[#D4AF37]">graphic_eq</span>
+            className="flex items-center gap-2.5 px-4 py-2 rounded-full glass-btn active:scale-95 transition-all duration-300 hover:bg-white/[0.08]"
+            style={{ borderColor: `${dominantColor}20` }}>
+            <span className="material-symbols-outlined text-[18px]" style={{ color: dominantColor }}>graphic_eq</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Audio Experience</span>
           </button>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowQueue(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-all duration-300 active:scale-90 text-zinc-400 hover:text-[#D4AF37]">
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-all duration-300 active:scale-90 text-zinc-400 hover:text-white">
               <span className="material-symbols-outlined text-[22px]">queue_music</span>
             </button>
             <button onClick={() => downloadCurrentTrack()} disabled={downloading}
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-all duration-300 active:scale-90 text-zinc-400 hover:text-[#D4AF37] disabled:opacity-40">
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-all duration-300 active:scale-90 text-zinc-400 hover:text-white disabled:opacity-40">
               {downloading ? (
                 <div className="w-4 h-4 rounded-full border border-zinc-500/30 border-t-zinc-300 animate-spin" />
               ) : (
@@ -294,7 +458,7 @@ export default function PlayerPage() {
           </div>
           <div className="max-w-md mx-auto space-y-8">
             <div className="flex items-center justify-between">
-              <h3 className="font-headline-md text-xl md:text-2xl text-[#D4AF37]">Audio Excellence</h3>
+              <h3 className="font-headline-md text-xl md:text-2xl" style={{ color: dominantColor }}>Audio Excellence</h3>
               <span className="material-symbols-outlined text-zinc-500 text-[24px]">settings</span>
             </div>
 
@@ -303,7 +467,7 @@ export default function PlayerPage() {
               <span className="material-symbols-outlined text-zinc-500 text-[20px]">volume_down</span>
               <div className="flex-1 relative h-1 bg-white/[0.06] rounded-full overflow-hidden cursor-pointer"
                 onClick={handleVolumeClick}>
-                <div className="h-full bg-gradient-to-r from-[#D4AF37]/60 to-[#FFBF00]/60 rounded-full transition-all" style={{ width: `${volume * 100}%` }} />
+                <div className="h-full rounded-full transition-all" style={{ width: `${volume * 100}%`, background: `linear-gradient(90deg, ${dominantColor}99, ${accentColor})` }} />
               </div>
               <span className="material-symbols-outlined text-zinc-500 text-[20px]">volume_up</span>
             </div>
@@ -311,8 +475,8 @@ export default function PlayerPage() {
             {/* Spatial Audio */}
             <div className="flex items-center justify-between p-5 rounded-2xl glass-card">
               <div className="flex items-center gap-4">
-                <div className="w-11 h-11 rounded-full bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/10">
-                  <span className="material-symbols-outlined text-[#D4AF37] text-xl">spatial_audio</span>
+                <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: `${dominantColor}15`, border: `1px solid ${dominantColor}15` }}>
+                  <span className="material-symbols-outlined text-xl" style={{ color: dominantColor }}>spatial_audio</span>
                 </div>
                 <div>
                   <p className="text-sm text-white font-medium">Spatial Audio Pro</p>
@@ -320,12 +484,17 @@ export default function PlayerPage() {
                 </div>
               </div>
               <button onClick={() => setSoundEffect('spatialAudio', !soundEffects.spatialAudio)}
-                className={`w-11 h-6 rounded-full relative flex items-center px-1.5 border transition-all duration-300 ${
-                  soundEffects.spatialAudio ? 'bg-[#D4AF37]/20 border-[#D4AF37]/30' : 'bg-white/10 border-white/10'
-                }`}>
-                <div className={`w-3.5 h-3.5 rounded-full transition-all duration-300 ${
-                  soundEffects.spatialAudio ? 'bg-[#D4AF37] ml-auto shadow-[0_0_12px_#D4AF37]' : 'bg-white/40'
-                }`} />
+                className="w-11 h-6 rounded-full relative flex items-center px-1.5 border transition-all duration-300"
+                style={{
+                  backgroundColor: soundEffects.spatialAudio ? `${dominantColor}20` : 'rgba(255,255,255,0.1)',
+                  borderColor: soundEffects.spatialAudio ? `${dominantColor}30` : 'rgba(255,255,255,0.1)',
+                }}>
+                <div className="w-3.5 h-3.5 rounded-full transition-all duration-300"
+                  style={{
+                    backgroundColor: soundEffects.spatialAudio ? dominantColor : 'rgba(255,255,255,0.4)',
+                    marginLeft: soundEffects.spatialAudio ? 'auto' : '0',
+                    boxShadow: soundEffects.spatialAudio ? `0 0 12px ${dominantColor}` : 'none',
+                  }} />
               </button>
             </div>
 
@@ -339,9 +508,8 @@ export default function PlayerPage() {
                 ].map(band => (
                   <div key={band.label} className="flex-1 flex flex-col items-center gap-2">
                     <div className="w-full h-28 bg-white/[0.04] rounded-full relative overflow-hidden border border-white/[0.06]">
-                      <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#D4AF37]/20 to-[#D4AF37]/40 rounded-full" style={{ height: `${band.h}%` }} />
-                      <div className="absolute left-1/2 w-2.5 h-2.5 bg-[#D4AF37] rounded-full shadow-[0_0_8px_#D4AF37]"
-                        style={{ top: `${100 - band.h}%`, transform: 'translate(-50%, -50%)' }} />
+                      <div className="absolute bottom-0 left-0 w-full rounded-full" style={{ height: `${band.h}%`, background: `linear-gradient(to top, ${dominantColor}30, ${dominantColor}60)` }} />
+                      <div className="absolute left-1/2 w-2.5 h-2.5 rounded-full" style={{ top: `${100 - band.h}%`, transform: 'translate(-50%, -50%)', backgroundColor: dominantColor, boxShadow: `0 0 8px ${dominantColor}` }} />
                     </div>
                     <span className="text-[8px] text-zinc-600 font-medium tracking-tight">{band.label}</span>
                   </div>
@@ -360,7 +528,7 @@ export default function PlayerPage() {
 
       {/* Queue overlay */}
       {showQueue && (
-        <div className="fixed inset-0 z-40 bg-[#050505]/95 backdrop-blur-2xl fade-in flex flex-col">
+        <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-2xl fade-in flex flex-col">
           <div className="flex items-center justify-between px-5 pt-12 pb-3">
             <div>
               <h3 className="text-sm text-zinc-300 font-[family-name:var(--font-serif)]">Up Next</h3>
@@ -375,10 +543,9 @@ export default function PlayerPage() {
               const trackSrc = track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/default.jpg` : (track.album.cover_small || track.album.cover_medium);
               return (
                 <div key={`${track.source || 'queue'}-${track.id}`}
-                  className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
-                    i === queueIndex ? 'bg-[#D4AF37]/[0.06] border border-[#D4AF37]/20' : 'hover:bg-white/[0.03] border border-transparent'
-                  }`}>
-                  <span className={`w-5 text-center text-[11px] font-mono ${i === queueIndex ? 'text-[#D4AF37]' : 'text-zinc-600'}`}>{i + 1}</span>
+                  className="flex items-center gap-3 p-2.5 rounded-xl transition-all border border-transparent"
+                  style={i === queueIndex ? { backgroundColor: `${dominantColor}0D`, borderColor: `${dominantColor}25` } : {}} >
+                  <span className="w-5 text-center text-[11px] font-mono" style={{ color: i === queueIndex ? dominantColor : 'rgb(113,113,122)' }}>{i + 1}</span>
                   {trackSrc ? (
                     <img src={trackSrc} alt="" className="w-10 h-10 rounded-lg object-cover" />
                   ) : (
@@ -387,13 +554,11 @@ export default function PlayerPage() {
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className={`text-[13px] font-medium truncate ${i === queueIndex ? 'text-[#D4AF37]' : 'text-zinc-200'}`}>{track.title}</p>
+                    <p className="text-[13px] font-medium truncate" style={{ color: i === queueIndex ? dominantColor : 'rgb(228,228,231)' }}>{track.title}</p>
                     <p className="text-[11px] text-zinc-500 truncate">{track.artist.name}</p>
                   </div>
                   {i === queueIndex && (
-                    <div className="flex items-center gap-1 text-[#D4AF37]">
-                      <span className="material-symbols-outlined text-sm">volume_up</span>
-                    </div>
+                    <span className="material-symbols-outlined text-sm" style={{ color: dominantColor }}>volume_up</span>
                   )}
                 </div>
               );
@@ -401,13 +566,6 @@ export default function PlayerPage() {
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes album-float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-6px); }
-        }
-      `}</style>
     </div>
   );
 }
