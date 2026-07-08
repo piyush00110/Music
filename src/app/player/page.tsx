@@ -247,26 +247,15 @@ export default function PlayerPage() {
         {/* Left column - Album + Info + Controls */}
         <div className="flex flex-col items-center justify-center space-y-5 md:space-y-6 py-4">
 
-          {/* Album art with vinyl effect */}
-          <div className="relative">
-            <div className={`absolute -inset-4 rounded-full bg-gradient-to-br from-[#1DB954]/10 via-transparent to-transparent blur-2xl transition-opacity duration-700 ${isPlaying ? 'opacity-100' : 'opacity-40'}`} />
-            <div className={`relative w-64 h-64 md:w-72 md:h-72 rounded-full bg-gradient-to-br from-zinc-700 via-zinc-800 to-black p-2 shadow-2xl shadow-black/60 ${isPlaying ? 'animate-spin-slow' : ''}`}
-              style={{ animationDuration: '6s', animationTimingFunction: 'linear', animationIterationCount: 'infinite', animationPlayState: isPlaying ? 'running' : 'paused' }}>
-              <div className="absolute inset-3 rounded-full border border-white/[0.03]" />
-              <div className="absolute inset-6 rounded-full border border-white/[0.02]" />
-              <div className="absolute inset-9 rounded-full border border-white/[0.02]" />
-              <div className="absolute inset-12 rounded-full border border-white/[0.01]" />
-              <div className="w-full h-full rounded-full overflow-hidden ring-2 ring-white/[0.06]">
-                {artSrc ? (
-                  <img src={artSrc} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-zinc-800">
-                    <span className="material-symbols-outlined text-5xl text-zinc-700">music_note</span>
-                  </div>
-                )}
+          {/* Album art */}
+          <div className="relative w-64 h-64 md:w-72 md:h-72 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/[0.06]">
+            {artSrc ? (
+              <img src={artSrc} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-zinc-800">
+                <span className="material-symbols-outlined text-5xl text-zinc-700">music_note</span>
               </div>
-              <div className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-t from-transparent via-transparent to-white/[0.03]" />
-            </div>
+            )}
           </div>
 
           {/* Visualizer */}
