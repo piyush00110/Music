@@ -108,15 +108,12 @@ async function searchDeezer(query: string): Promise<Track[]> {
 
 // ─── Ranking ─────────────────────────────────────────────────────
 function rankTracks(tracks: Track[]): Track[] {
-  const songMin = 30;
-  const songMax = 1200;
-  return tracks
-    .filter(t => t.duration >= songMin && t.duration <= songMax)
-    .sort((a, b) => {
-      const aScore = (a.duration >= 120 && a.duration <= 600 ? 10 : 5) + (a.youtubeId ? 20 : (a.source === 'audius' ? 10 : 0));
-      const bScore = (b.duration >= 120 && b.duration <= 600 ? 10 : 5) + (b.youtubeId ? 20 : (b.source === 'audius' ? 10 : 0));
-      return bScore - aScore;
-    });
+  return tracks.sort((a, b) => {
+    const ideal = (d: number) => d >= 120 && d <= 600;
+    const aScore = (ideal(a.duration) ? 10 : a.duration >= 30 ? 5 : 0) + (a.youtubeId ? 20 : (a.source === 'audius' ? 10 : 0)) + (a.duration > 0 ? 1 : 0);
+    const bScore = (ideal(b.duration) ? 10 : b.duration >= 30 ? 5 : 0) + (b.youtubeId ? 20 : (b.source === 'audius' ? 10 : 0)) + (b.duration > 0 ? 1 : 0);
+    return bScore - aScore;
+  });
 }
 
 // ─── Unified Search ─────────────────────────────────────────────
@@ -151,23 +148,21 @@ export async function findOnYouTube(title: string, artist: string): Promise<stri
 }
 
 // ─── Trending ────────────────────────────────────────────────────
-const TRENDING_QUERIES = ['new music 2026', 'trending music', 'popular songs', 'viral hits'];
+const TRENDING_QUERIES = ['popular music 2026', 'top hits 2026', 'trending songs', 'viral songs', 'new songs 2026'];
 
 export async function getTrending(): Promise<Track[]> {
   const [au] = await Promise.all([getAudiusTrending().catch(() => [] as Track[])]);
   const all = [...au];
 
-  // Try YouTube searches until we get results
   for (const q of TRENDING_QUERIES) {
-    if (all.length >= 20) break;
     const yt = await searchYT(q).catch(() => [] as Track[]);
     for (const t of yt) {
-      if (all.length >= 30) break;
+      if (all.length >= 40) break;
       if (!all.some(a => a.youtubeId === t.youtubeId)) all.push(t);
     }
   }
 
-  return rankTracks(all).slice(0, 30);
+  return rankTracks(all).slice(0, 40);
 }
 
 // ─── Recommendations ─────────────────────────────────────────────
@@ -186,10 +181,7 @@ export async function getRecommendations(recentlyPlayed: Track[]): Promise<Track
   for (const q of queries) {
     try {
       const tracks = await searchMusic(q);
-      const filtered = tracks.filter(t =>
-        !recentlyPlayed.some(r => r.id === t.id) &&
-        t.duration >= 30 && t.duration <= 1200
-      );
+      const filtered = tracks.filter(t => !recentlyPlayed.some(r => r.id === t.id));
       if (filtered.length >= 6) return filtered.slice(0, 10);
     } catch {}
   }
