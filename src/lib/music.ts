@@ -2,173 +2,114 @@ import type { Track } from './types';
 
 const AUDIUS = 'https://discoveryprovider.audius.co';
 
-const AUDIUS_TIMEOUT = 8000;
+function trackFromItem(v: any, i: number): Track {
+  const base = {
+    id: v.id || i,
+    title: v.title || '',
+    artist: { id: v.artistId || i, name: v.artistName || v.artist || 'Unknown' },
+    album: { id: i, title: '', cover: '', cover_small: '', cover_medium: '', cover_big: '', cover_xl: '' },
+    duration: v.duration || 0,
+    preview: '',
+    source: (v.source || 'youtube') as Track['source'],
+  };
 
-// ─── YouTube (via local API proxy) ──────────────────────────────
-async function searchYT(query: string): Promise<Track[]> {
-  try {
-    const url = `/api/youtube/search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.items || []).map((v: any, i: number): Track => ({
-      id: i + 1,
-      title: v.title || '',
-      artist: { id: i + 1, name: v.channel || 'Unknown' },
-      album: {
-        id: i + 1, title: v.channel || '',
-        cover: '', cover_small: '',
-        cover_medium: v.thumbnail || '',
-        cover_big: '', cover_xl: '',
-      },
-      duration: v.duration || 0,
-      preview: v.videoId || '',
-      youtubeId: v.videoId || '',
-      source: 'youtube',
-    }));
-  } catch { return []; }
-}
-
-// ─── Audius (free, no key, CORS-friendly) ────────────────────────
-async function searchAudius(query: string, limit = 15): Promise<Track[]> {
-  try {
-    const res = await fetch(
-      `${AUDIUS}/v1/tracks/search?query=${encodeURIComponent(query)}&limit=${limit}`,
-      { signal: AbortSignal.timeout(AUDIUS_TIMEOUT) },
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.data || []).map((t: any, i: number): Track => ({
-      id: 5000 + i,
-      title: t.title || '',
-      artist: { id: t.user?.id || i, name: t.user?.name || 'Unknown' },
-      album: {
-        id: t.track_id || i, title: t.album?.name || t.title || '',
-        cover: t.artwork?.url_100x100?.replace('100x100', '480x480') || '',
-        cover_small: t.artwork?.url_100x100 || '',
-        cover_medium: t.artwork?.url_480x480 || t.artwork?.url_100x100 || '',
-        cover_big: t.artwork?.url_100x100?.replace('100x100', '1000x1000') || '',
-        cover_xl: t.artwork?.url_100x100?.replace('100x100', '2000x2000') || '',
-      },
-      duration: t.duration || 0,
-      preview: `${AUDIUS}/v1/tracks/${t.id}/stream`,
-      source: 'audius',
-    }));
-  } catch { return []; }
-}
-
-async function getAudiusTrending(): Promise<Track[]> {
-  try {
-    const res = await fetch(`${AUDIUS}/v1/tracks/trending?limit=25`, { signal: AbortSignal.timeout(AUDIUS_TIMEOUT) });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.data || []).map((t: any, i: number): Track => ({
-      id: 5000 + i,
-      title: t.title || '',
-      artist: { id: t.user?.id || i, name: t.user?.name || 'Unknown' },
-      album: {
-        id: t.track_id || i, title: t.album?.name || t.title || '',
-        cover: t.artwork?.url_100x100?.replace('100x100', '480x480') || '',
-        cover_small: t.artwork?.url_100x100 || '',
-        cover_medium: t.artwork?.url_480x480 || t.artwork?.url_100x100 || '',
-        cover_big: t.artwork?.url_100x100?.replace('100x100', '1000x1000') || '',
-        cover_xl: t.artwork?.url_100x100?.replace('100x100', '2000x2000') || '',
-      },
-      duration: t.duration || 0,
-      preview: `${AUDIUS}/v1/tracks/${t.id}/stream`,
-      source: 'audius',
-    }));
-  } catch { return []; }
-}
-
-// ─── Deezer (best-effort) ────────────────────────────────────────
-async function searchDeezer(query: string): Promise<Track[]> {
-  try {
-    const res = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=15`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.data || []).map((t: any, i: number): Track => ({
-      id: 1000 + i,
-      title: t.title,
-      artist: { id: t.artist?.id || i, name: t.artist?.name || 'Unknown' },
-      album: {
-        id: t.album?.id || i, title: t.album?.title || '',
-        cover: t.album?.cover || '', cover_small: t.album?.cover_small || '',
-        cover_medium: t.album?.cover_medium || '', cover_big: t.album?.cover_big || '',
-        cover_xl: t.album?.cover_xl || '',
-      },
-      duration: t.duration || 0,
-      preview: t.preview || '',
-      source: 'deezer',
-    }));
-  } catch { return []; }
-}
-
-// ─── Ranking ─────────────────────────────────────────────────────
-function rankTracks(tracks: Track[]): Track[] {
-  return tracks.sort((a, b) => {
-    const ideal = (d: number) => d >= 120 && d <= 600;
-    const aScore = (ideal(a.duration) ? 10 : a.duration >= 30 ? 5 : 0) + (a.youtubeId ? 20 : (a.source === 'audius' ? 10 : 0)) + (a.duration > 0 ? 1 : 0);
-    const bScore = (ideal(b.duration) ? 10 : b.duration >= 30 ? 5 : 0) + (b.youtubeId ? 20 : (b.source === 'audius' ? 10 : 0)) + (b.duration > 0 ? 1 : 0);
-    return bScore - aScore;
-  });
-}
-
-// ─── Unified Search ─────────────────────────────────────────────
-export async function searchMusic(query: string): Promise<Track[]> {
-  if (!query.trim()) return [];
-  const [yt, au, dz] = await Promise.all([
-    searchYT(query).catch(() => [] as Track[]),
-    searchAudius(query).catch(() => [] as Track[]),
-    searchDeezer(query).catch(() => [] as Track[]),
-  ]);
-
-  const seen = new Set<string>();
-  const all: Track[] = [];
-
-  for (const t of rankTracks([...yt, ...au, ...dz])) {
-    const key = (t.title + t.artist.name).toLowerCase().replace(/\s+/g, '');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    all.push(t);
+  if (v.source === 'youtube') {
+    base.album.title = v.channel || 'YouTube';
+    base.album.cover_medium = v.cover || '';
+    base.album.cover = v.cover || '';
+    base.album.cover_small = v.cover || '';
+    base.preview = v.stream || v.videoId || '';
+    return { ...base, youtubeId: v.videoId || v.stream || '' };
   }
 
-  return all;
+  if (v.source === 'audius') {
+    base.album.title = v.title || '';
+    base.album.cover = v.cover || '';
+    base.album.cover_small = v.cover || '';
+    base.album.cover_medium = v.cover || '';
+    base.preview = `${AUDIUS}/v1/tracks/${v.stream}/stream`;
+    return base;
+  }
+
+  if (v.source === 'deezer') {
+    base.album.title = '';
+    base.album.cover = v.cover || '';
+    base.album.cover_small = v.cover || '';
+    base.album.cover_medium = v.cover || '';
+    base.preview = v.stream || '';
+    return base;
+  }
+
+  return base;
 }
 
-// ─── YouTube search for non-YouTube tracks ───────────────────────
-export async function findOnYouTube(title: string, artist: string): Promise<string | null> {
-  const q = `${artist} - ${title}`;
+// ─── Unified Search (server-side) ──────────────────────────────
+export async function searchMusic(query: string): Promise<Track[]> {
+  if (!query.trim()) return [];
+
+  const url = `/api/search?q=${encodeURIComponent(query)}`;
   try {
-    const tracks = await searchYT(q);
-    return tracks[0]?.youtubeId || null;
-  } catch { return null; }
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const seen = new Set<string>();
+    const all: Track[] = [];
+    for (const v of (data.items || [])) {
+      const track = trackFromItem(v, all.length + 1);
+      const key = (track.title + track.artist.name).toLowerCase().replace(/\s+/g, '');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      all.push(track);
+    }
+    return all;
+  } catch {
+    return [];
+  }
 }
 
-// ─── Trending ────────────────────────────────────────────────────
-const TRENDING_QUERIES = ['popular music 2026', 'top hits 2026', 'trending songs', 'viral songs', 'new songs 2026'];
-
+// ─── Trending ───────────────────────────────────────────────────
 export async function getTrending(): Promise<Track[]> {
-  const [au] = await Promise.all([getAudiusTrending().catch(() => [] as Track[])]);
-  const all = [...au];
+  const all: Track[] = [];
+  try {
+    const res = await fetch(`${AUDIUS}/v1/tracks/trending?limit=25`, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const data = await res.json();
+      for (const t of (data.data || []).slice(0, 25)) {
+        const i = all.length + 1;
+        const cover = t.artwork?.url_100x100?.replace('100x100', '300x300') || '';
+        all.push({
+          id: 5000 + i,
+          title: t.title || '',
+          artist: { id: t.user?.id || i, name: t.user?.name || 'Unknown' },
+          album: { id: i, title: t.title || '', cover, cover_small: cover || '', cover_medium: cover || '', cover_big: '', cover_xl: '' },
+          duration: t.duration || 0,
+          preview: `${AUDIUS}/v1/tracks/${t.id}/stream`,
+          source: 'audius',
+        });
+      }
+    }
+  } catch {}
 
-  for (const q of TRENDING_QUERIES) {
-    const yt = await searchYT(q).catch(() => [] as Track[]);
-    for (const t of yt) {
+  const queries = ['popular music 2026', 'top hits 2026', 'trending songs', 'viral songs', 'new songs 2026'];
+  const ytResults = await Promise.all(
+    queries.map(q => fetch(`/api/search?q=${encodeURIComponent(q)}&mode=yt-only`, { signal: AbortSignal.timeout(8000) })
+      .then(r => r.ok ? r.json() : { items: [] })
+      .catch(() => ({ items: [] }))),
+  );
+  for (const data of ytResults) {
+    for (const v of (data.items || [])) {
       if (all.length >= 40) break;
-      if (!all.some(a => a.youtubeId === t.youtubeId)) all.push(t);
+      const track = trackFromItem(v, all.length + 1);
+      if (!all.some(a => a.youtubeId && a.youtubeId === track.youtubeId)) all.push(track);
     }
   }
 
-  return rankTracks(all).slice(0, 40);
+  return all.slice(0, 40);
 }
 
-// ─── Recommendations ─────────────────────────────────────────────
+// ─── Recommendations ────────────────────────────────────────────
 export async function getRecommendations(recentlyPlayed: Track[]): Promise<Track[]> {
   if (!recentlyPlayed.length) return getTrending();
-
   const played = recentlyPlayed.slice(0, 5);
   const artists = [...new Set(played.map(t => t.artist.name))].filter(Boolean);
   const titles = played.map(t => t.title.split(/[\(\[-]/)[0].trim()).filter(Boolean);
@@ -185,8 +126,13 @@ export async function getRecommendations(recentlyPlayed: Track[]): Promise<Track
       if (filtered.length >= 6) return filtered.slice(0, 10);
     } catch {}
   }
-
   return getTrending();
+}
+
+// ─── YouTube search for non-YouTube tracks ───────────────────────
+export async function findOnYouTube(title: string, artist: string): Promise<string | null> {
+  const tracks = await searchMusic(`${artist} - ${title}`);
+  return tracks.find(t => t.source === 'youtube')?.youtubeId || null;
 }
 
 export const GENRES = [
