@@ -137,6 +137,37 @@ export default function PlayerPage() {
     setVolume(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
   }, [setVolume]);
 
+  // Keyboard controls
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          setVolume(Math.min(1, volume + 0.05));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setVolume(Math.max(0, volume - 0.05));
+          break;
+        case ' ':
+          e.preventDefault();
+          isPlaying ? pause() : resume();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          next();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          prev();
+          break;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isPlaying, pause, resume, next, prev, setVolume, volume]);
+
   if (!currentTrack) {
     return (
       <div className="flex items-center justify-center min-h-[70vh] px-4">
@@ -158,10 +189,6 @@ export default function PlayerPage() {
   return (
     <div className="relative min-h-screen flex flex-col bg-black overflow-hidden selection:bg-primary/30 font-body-md">
       <style jsx>{`
-        @keyframes album-float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-        }
         @keyframes wave-slow {
           0% { transform: translateX(0) scaleY(1); }
           50% { transform: translateX(-25%) scaleY(1.3); }
@@ -184,6 +211,33 @@ export default function PlayerPage() {
           from { transform: translate(-50%, -50%) rotate(360deg); }
           to { transform: translate(-50%, -50%) rotate(0deg); }
         }
+        @keyframes vinyl-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes bokeh-float {
+          0%, 100% { transform: translateY(0) translateX(0) scale(1); opacity: 0.3; }
+          25% { transform: translateY(-20px) translateX(10px) scale(1.1); opacity: 0.5; }
+          50% { transform: translateY(-10px) translateX(-5px) scale(0.9); opacity: 0.4; }
+          75% { transform: translateY(-25px) translateX(-10px) scale(1.05); opacity: 0.35; }
+        }
+        @keyframes spectrum-bar {
+          0%, 100% { transform: scaleY(0.3); }
+          50% { transform: scaleY(1); }
+        }
+        @keyframes breathe-ring {
+          0%, 100% { transform: scale(1); opacity: 0.15; }
+          50% { transform: scale(1.05); opacity: 0.3; }
+        }
+        @keyframes gradient-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes shimmer-slide {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
       `}</style>
 
       {/* === BACKGROUND LAYERS === */}
@@ -194,6 +248,14 @@ export default function PlayerPage() {
             style={{ backgroundImage: `url(${artSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
         )}
         <div className="absolute inset-0 bg-black/60" />
+
+        {/* Dynamic gradient shift */}
+        <div className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{
+            background: `linear-gradient(135deg, ${dominantColor}15, transparent 40%, ${accentColor}10, transparent 70%, ${dominantColor}08)`,
+            backgroundSize: '400% 400%',
+            animation: isPlaying ? 'gradient-shift 8s ease infinite' : 'none',
+          }} />
 
         {/* Slow wave forms */}
         <div className="absolute bottom-0 left-0 w-[200%] h-40 opacity-[0.06] pointer-events-none"
@@ -219,6 +281,20 @@ export default function PlayerPage() {
             opacity: glowIntensity,
             filter: 'blur(80px)',
           }} />
+
+        {/* Bokeh Particles */}
+        {isPlaying && Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="absolute rounded-full pointer-events-none"
+            style={{
+              width: `${6 + (i % 3) * 4}px`,
+              height: `${6 + (i % 3) * 4}px`,
+              backgroundColor: i % 2 === 0 ? `${dominantColor}40` : `${accentColor}30`,
+              top: `${15 + (i * 11) % 70}%`,
+              left: `${10 + (i * 13) % 80}%`,
+              animation: `bokeh-float ${4 + (i % 3) * 2}s ease-in-out infinite ${i * 0.5}s`,
+              filter: 'blur(2px)',
+            }} />
+        ))}
 
         {/* Vignette */}
         <div className="absolute inset-0 pointer-events-none"
@@ -284,8 +360,45 @@ export default function PlayerPage() {
                   animation: 'ring-spin-reverse 6s linear infinite',
                   top: '50%', left: '50%',
                 }} />
+              {/* Breathing glow ring */}
+              <div className="absolute w-[280px] md:w-[320px] h-[280px] md:h-[320px] rounded-full pointer-events-none"
+                style={{
+                  border: `3px solid ${dominantColor}25`,
+                  animation: 'breathe-ring 3s ease-in-out infinite',
+                  top: '50%', left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                }} />
             </>
           )}
+
+          {/* Vinyl Record behind album art */}
+          <div className="absolute pointer-events-none"
+            style={{
+              width: '260px', height: '260px',
+              top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              opacity: isPlaying ? 0.15 : 0.08,
+              transition: 'opacity 0.5s',
+            }}>
+            <div className="w-full h-full rounded-full"
+              style={{
+                background: `conic-gradient(from 0deg, ${dominantColor}40, #111 20%, ${dominantColor}20 40%, #0a0a0a 60%, ${dominantColor}30 80%, #111 100%)`,
+                animation: isPlaying ? 'vinyl-spin 4s linear infinite' : 'none',
+                boxShadow: `inset 0 0 40px rgba(0,0,0,0.8), 0 0 30px ${dominantColor}10`,
+              }}>
+              {/* Vinyl grooves */}
+              <div className="absolute inset-[15%] rounded-full border border-white/5" />
+              <div className="absolute inset-[25%] rounded-full border border-white/5" />
+              <div className="absolute inset-[35%] rounded-full border border-white/5" />
+              <div className="absolute inset-[45%] rounded-full border border-white/5" />
+              {/* Center label */}
+              <div className="absolute inset-[38%] rounded-full"
+                style={{
+                  background: `radial-gradient(circle, ${dominantColor}60, ${dominantColor}30)`,
+                  boxShadow: `inset 0 0 10px ${dominantColor}40`,
+                }} />
+            </div>
+          </div>
 
           {/* Waveform bars behind art */}
           <div className="absolute inset-0 flex items-center justify-center gap-[3px] pointer-events-none">
@@ -301,9 +414,8 @@ export default function PlayerPage() {
             ))}
           </div>
 
-          {/* Album Art */}
-          <div className="relative"
-            style={{ animation: isPlaying ? 'album-float 6s ease-in-out infinite' : 'none' }}>
+          {/* Album Art - Static */}
+          <div className="relative">
             {/* Ambient glow under art */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-[80%] h-16 rounded-full pointer-events-none transition-all duration-1000"
               style={{
@@ -320,13 +432,23 @@ export default function PlayerPage() {
                 border: `1px solid ${isPlaying ? dominantColor + '30' : 'rgba(255,255,255,0.06)'}`,
               }}>
               {artSrc ? (
-                <img src={artSrc} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <img src={artSrc} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-zinc-800/50">
                   <span className="material-symbols-outlined text-6xl text-zinc-700">music_note</span>
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+              {/* Shimmer overlay */}
+              {isPlaying && (
+                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+                  <div className="absolute inset-0 -translate-x-full"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${dominantColor}08, transparent)`,
+                      animation: 'shimmer-slide 3s ease-in-out infinite',
+                    }} />
+                </div>
+              )}
               {/* Playing indicator */}
               {isPlaying && (
                 <div className="absolute bottom-3 right-3 flex items-center gap-[3px] bg-black/50 backdrop-blur-md rounded-full px-2.5 py-1.5 border border-white/[0.06]">
@@ -337,6 +459,20 @@ export default function PlayerPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Spectrum Analyzer Bar */}
+        <div className="flex items-end justify-center gap-[2px] h-8 mb-2 pointer-events-none">
+          {Array.from({ length: 32 }).map((_, i) => (
+            <div key={i} className="w-[2px] rounded-full origin-bottom"
+              style={{
+                backgroundColor: i < 10 ? dominantColor : i < 22 ? `${dominantColor}80` : `${dominantColor}40`,
+                height: isPlaying ? '100%' : '20%',
+                animation: isPlaying ? `spectrum-bar ${0.4 + (i % 5) * 0.15}s ease-in-out infinite ${i * 0.05}s` : 'none',
+                opacity: isPlaying ? 0.6 : 0.15,
+                transition: 'opacity 0.3s',
+              }} />
+          ))}
         </div>
 
         {/* Track Info */}
