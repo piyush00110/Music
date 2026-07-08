@@ -58,7 +58,7 @@ export default function PlayerPage() {
 
   if (!currentTrack) {
     return (
-      <div className="flex items-center justify-center min-h-screen px-4 bg-[#0a0a0f]">
+      <div className="flex items-center justify-center h-screen px-4 bg-[#0a0a0f]">
         <div className="text-center">
           <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-zinc-800 flex items-center justify-center ring-1 ring-white/[0.06]">
             <span className="material-symbols-outlined text-4xl text-zinc-600">music_note</span>
@@ -79,14 +79,14 @@ export default function PlayerPage() {
   const albumTitle = currentTrack.album?.title || 'Unknown Album';
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#0a0a0f]">
+    <div className="relative h-screen flex flex-col bg-[#0a0a0f] overflow-hidden">
       <div className="fixed inset-0 pointer-events-none" style={{ backgroundImage: `url(${artSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(40px) brightness(0.4)', opacity: 0.8 }} />
       <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-transparent via-[#0a0a0f]/30 to-[#0a0a0f]" />
 
       {/* Top bar */}
-      <header className="relative z-10 flex items-center justify-between px-4 md:px-6 pt-12 pb-2">
-        <Link href="/" className="w-10 h-10 rounded-full bg-white/5 backdrop-blur-xl flex items-center justify-center text-zinc-400 hover:text-white transition-all active:scale-90">
-          <span className="material-symbols-outlined text-xl">chevron_left</span>
+      <header className="relative z-10 flex items-center justify-between px-4 md:px-8 pt-12 md:pt-14 pb-1 md:pb-2">
+        <Link href="/" className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 backdrop-blur-xl flex items-center justify-center text-zinc-400 hover:text-white transition-all active:scale-90">
+          <span className="material-symbols-outlined text-lg md:text-xl">chevron_left</span>
         </Link>
         <div className="flex items-center gap-2">
           {sleepTimer && (
@@ -95,16 +95,15 @@ export default function PlayerPage() {
               {sleepTimer}m
             </button>
           )}
-          <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-medium">Now Playing</p>
         </div>
-        <button onClick={() => setShowMenu(!showMenu)} className="w-10 h-10 rounded-full bg-white/5 backdrop-blur-xl flex items-center justify-center text-zinc-400 hover:text-white transition-all active:scale-90">
-          <span className="material-symbols-outlined text-xl">more_horiz</span>
+        <button onClick={() => setShowMenu(!showMenu)} className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white/5 backdrop-blur-xl flex items-center justify-center text-zinc-400 hover:text-white transition-all active:scale-90">
+          <span className="material-symbols-outlined text-lg md:text-xl">more_horiz</span>
         </button>
       </header>
 
       {/* Menu */}
       {showMenu && (
-        <div className="fixed top-24 right-4 md:right-6 z-50 bg-zinc-900/95 backdrop-blur-2xl border border-white/[0.06] rounded-2xl p-2 min-w-[200px] shadow-2xl fade-in">
+        <div className="fixed top-24 right-4 md:right-8 z-50 bg-zinc-900/95 backdrop-blur-2xl border border-white/[0.06] rounded-2xl p-2 min-w-[200px] shadow-2xl fade-in">
           <button onClick={() => { setShowEq(!showEq); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-zinc-300 hover:bg-white/[0.06] transition-all">
             <span className="material-symbols-outlined text-zinc-400">tune</span>
             Equalizer
@@ -151,10 +150,10 @@ export default function PlayerPage() {
         </div>
       )}
 
-      {/* EQ panel */}
-      {showEq && (
-        <div className="relative z-10 px-4 md:px-6 mb-2 fade-in">
-          <div className="bg-zinc-900/90 backdrop-blur-2xl border border-white/[0.06] rounded-2xl p-4 md:p-5">
+      {/* EQ / FX panels */}
+      <div className="relative z-10 px-4 md:px-8">
+        {showEq && (
+          <div className="mb-2 fade-in bg-zinc-900/90 backdrop-blur-2xl border border-white/[0.06] rounded-2xl p-4 md:p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Equalizer</h3>
               <button onClick={() => setShowEq(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
@@ -163,13 +162,9 @@ export default function PlayerPage() {
             </div>
             <Equalizer />
           </div>
-        </div>
-      )}
-
-      {/* FX panel */}
-      {showFx && (
-        <div className="relative z-10 px-4 md:px-6 mb-2 fade-in">
-          <div className="bg-zinc-900/90 backdrop-blur-2xl border border-white/[0.06] rounded-2xl p-4 md:p-5">
+        )}
+        {showFx && (
+          <div className="mb-2 fade-in bg-zinc-900/90 backdrop-blur-2xl border border-white/[0.06] rounded-2xl p-4 md:p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Sound Effects</h3>
               <button onClick={() => setShowFx(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
@@ -210,107 +205,110 @@ export default function PlayerPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Main content */}
-      <main className="relative z-10 flex-1 flex flex-col items-center px-4 md:px-6 pb-4 overflow-y-auto">
-        <div className="flex flex-col items-center justify-center space-y-5 md:space-y-6 py-4 w-full max-w-lg mx-auto">
+      {/* Main content - fills remaining space, no scroll */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-between px-6 md:px-8 pb-4 md:pb-6">
+        {/* Spacer for top bar */}
+        <div />
 
-          {/* Album art */}
-          <div className="relative w-64 h-64 md:w-72 md:h-72 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/[0.06]">
+        {/* Album art - big on both phone and PC */}
+        <div className="flex flex-col items-center space-y-1 md:space-y-2">
+          <div className="w-64 h-64 md:w-96 md:h-96 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/[0.06]">
             {artSrc ? (
               <img src={artSrc} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-zinc-800">
-                <span className="material-symbols-outlined text-5xl text-zinc-700">music_note</span>
+                <span className="material-symbols-outlined text-5xl md:text-7xl text-zinc-700">music_note</span>
               </div>
             )}
           </div>
 
-          {/* Visualizer */}
-          <div className="w-full max-w-sm">
-            <EnhancedVisualizer isPlaying={isPlaying} barCount={48} height={32} />
+          {/* Visualizer - compact */}
+          <div className="w-56 md:w-80">
+            <EnhancedVisualizer isPlaying={isPlaying} barCount={32} height={20} />
           </div>
 
           {/* Track info */}
-          <div className="w-full max-w-sm text-center space-y-1">
-            <h2 className="text-xl md:text-2xl font-bold text-white truncate">{currentTrack.title}</h2>
-            <p className="text-sm text-zinc-400 truncate hover:text-zinc-300 transition-colors cursor-pointer">{currentTrack.artist.name}</p>
-            <p className="text-[11px] text-zinc-600 truncate">{albumTitle}</p>
+          <div className="text-center space-y-0.5 md:space-y-1">
+            <h2 className="text-lg md:text-2xl font-bold text-white truncate max-w-[250px] md:max-w-md">{currentTrack.title}</h2>
+            <p className="text-xs md:text-sm text-zinc-400 truncate max-w-[250px] md:max-w-md">{currentTrack.artist.name} · {albumTitle}</p>
           </div>
+        </div>
 
+        {/* Bottom controls area */}
+        <div className="w-full max-w-sm md:max-w-md space-y-4 md:space-y-5">
           {/* Progress */}
-          <div className="w-full max-w-sm space-y-1.5">
-            <div className="relative w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden group cursor-pointer">
+          <div className="space-y-1 md:space-y-1.5">
+            <div className="relative w-full h-1 md:h-1.5 bg-white/[0.06] rounded-full overflow-hidden group cursor-pointer">
               <div className="absolute top-0 left-0 h-full bg-white rounded-full transition-all duration-300 group-hover:bg-[#1DB954]" style={{ width: `${pct}%` }} />
-              <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg shadow-black/40" style={{ left: `${pct}%` }} />
+              <div className="absolute top-1/2 -translate-y-1/2 w-3 md:w-3.5 h-3 md:h-3.5 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg shadow-black/40" style={{ left: `${pct}%` }} />
               <input type="range" min={0} max={duration || 1} value={progress} onChange={handleSeek}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
             </div>
-            <div className="flex justify-between text-[11px] text-zinc-600 font-mono tabular-nums">
+            <div className="flex justify-between text-[10px] md:text-[11px] text-zinc-600 font-mono tabular-nums">
               <span>{formatTime(progress)}</span>
               <span>{formatTime(duration)}</span>
             </div>
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-between w-full max-w-sm">
+          <div className="flex items-center justify-between">
             <button onClick={toggleShuffle} className={`transition-all active:scale-90 ${shuffle ? 'text-[#1DB954]' : 'text-zinc-400 hover:text-white'}`}>
-              <span className="material-symbols-outlined text-2xl">shuffle</span>
+              <span className="material-symbols-outlined text-xl md:text-2xl">shuffle</span>
             </button>
             <button onClick={prev} className="text-zinc-300 hover:text-white transition-all active:scale-90">
-              <span className="material-symbols-outlined text-[36px]">skip_previous</span>
+              <span className="material-symbols-outlined text-[28px] md:text-[36px]">skip_previous</span>
             </button>
             <button onClick={() => (isPlaying ? pause() : resume())}
-              className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-black hover:scale-105 active:scale-95 transition-all shadow-xl shadow-black/30">
-              <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white flex items-center justify-center text-black hover:scale-105 active:scale-95 transition-all shadow-xl shadow-black/30">
+              <span className="material-symbols-outlined text-[30px] md:text-[36px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                 {isPlaying ? 'pause' : 'play_arrow'}
               </span>
             </button>
             <button onClick={next} className="text-zinc-300 hover:text-white transition-all active:scale-90">
-              <span className="material-symbols-outlined text-[36px]">skip_next</span>
+              <span className="material-symbols-outlined text-[28px] md:text-[36px]">skip_next</span>
             </button>
             <button onClick={toggleRepeat} className={`transition-all active:scale-90 relative ${repeat !== 'off' ? 'text-[#1DB954]' : 'text-zinc-400 hover:text-white'}`}>
-              <span className="material-symbols-outlined text-2xl">repeat</span>
-              {repeat === 'one' && <span className="absolute -top-1 -right-1 text-[9px] font-bold text-[#1DB954]">1</span>}
+              <span className="material-symbols-outlined text-xl md:text-2xl">repeat</span>
+              {repeat === 'one' && <span className="absolute -top-1 -right-1 text-[8px] md:text-[9px] font-bold text-[#1DB954]">1</span>}
             </button>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center justify-between w-full max-w-sm px-1">
-            <button onClick={() => setLiked(!liked)} className={`transition-all active:scale-90 ${liked ? 'text-[#1DB954]' : 'text-zinc-500 hover:text-white'}`}>
-              <span className="material-symbols-outlined text-2xl" style={liked ? { fontVariationSettings: "'FILL' 1" } : undefined}>favorite</span>
-            </button>
-            <button onClick={() => setShowLyrics(!showLyrics)} className={`transition-all active:scale-90 ${showLyrics ? 'text-[#1DB954]' : 'text-zinc-500 hover:text-white'}`}>
-              <span className="material-symbols-outlined text-2xl">lyrics</span>
-            </button>
-            <button onClick={() => setShowQueue(!showQueue)} className={`transition-all active:scale-90 ${showQueue ? 'text-[#1DB954]' : 'text-zinc-500 hover:text-white'}`}>
-              <span className="material-symbols-outlined text-2xl">queue_music</span>
-            </button>
-            <button className="text-zinc-500 hover:text-white transition-all active:scale-90">
-              <span className="material-symbols-outlined text-2xl">devices</span>
-            </button>
-            <button onClick={() => downloadCurrentTrack()} disabled={downloading} className="text-zinc-500 hover:text-white transition-all active:scale-90 disabled:opacity-40">
-              {downloading ? (
-                <div className="w-5 h-5 rounded-full border border-zinc-500/30 border-t-zinc-300 animate-spin" />
-              ) : (
-                <span className="material-symbols-outlined text-2xl">download</span>
-              )}
-            </button>
-          </div>
-
-          {/* Volume */}
-          <div className="w-full max-w-sm flex items-center gap-3">
-            <span className="material-symbols-outlined text-lg text-zinc-500">volume_down</span>
-            <div className="flex-1 relative h-1.5 bg-white/[0.06] rounded-full overflow-hidden group cursor-pointer">
-              <div className="h-full bg-white/60 rounded-full transition-all duration-200 group-hover:bg-[#1DB954]/60" style={{ width: `${volume * 100}%` }} />
-              <input type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+          {/* Action buttons + Volume row */}
+          <div className="space-y-3 md:space-y-4">
+            <div className="flex items-center justify-between">
+              <button onClick={() => setLiked(!liked)} className={`transition-all active:scale-90 ${liked ? 'text-[#1DB954]' : 'text-zinc-500 hover:text-white'}`}>
+                <span className="material-symbols-outlined text-xl md:text-2xl" style={liked ? { fontVariationSettings: "'FILL' 1" } : undefined}>favorite</span>
+              </button>
+              <button onClick={() => setShowLyrics(!showLyrics)} className={`transition-all active:scale-90 ${showLyrics ? 'text-[#1DB954]' : 'text-zinc-500 hover:text-white'}`}>
+                <span className="material-symbols-outlined text-xl md:text-2xl">lyrics</span>
+              </button>
+              <button onClick={() => setShowQueue(!showQueue)} className={`transition-all active:scale-90 ${showQueue ? 'text-[#1DB954]' : 'text-zinc-500 hover:text-white'}`}>
+                <span className="material-symbols-outlined text-xl md:text-2xl">queue_music</span>
+              </button>
+              <button className="text-zinc-500 hover:text-white transition-all active:scale-90">
+                <span className="material-symbols-outlined text-xl md:text-2xl">devices</span>
+              </button>
+              <button onClick={() => downloadCurrentTrack()} disabled={downloading} className="text-zinc-500 hover:text-white transition-all active:scale-90 disabled:opacity-40">
+                {downloading ? (
+                  <div className="w-5 h-5 rounded-full border border-zinc-500/30 border-t-zinc-300 animate-spin" />
+                ) : (
+                  <span className="material-symbols-outlined text-xl md:text-2xl">download</span>
+                )}
+              </button>
             </div>
-            <span className="material-symbols-outlined text-lg text-zinc-500">volume_up</span>
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-base md:text-lg text-zinc-500">volume_down</span>
+              <div className="flex-1 relative h-1 md:h-1.5 bg-white/[0.06] rounded-full overflow-hidden group cursor-pointer">
+                <div className="h-full bg-white/60 rounded-full transition-all duration-200 group-hover:bg-[#1DB954]/60" style={{ width: `${volume * 100}%` }} />
+                <input type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              </div>
+              <span className="material-symbols-outlined text-base md:text-lg text-zinc-500">volume_up</span>
+            </div>
           </div>
         </div>
-
       </main>
 
       {/* Lyrics overlay */}
@@ -335,7 +333,7 @@ export default function PlayerPage() {
         </div>
       )}
 
-      {/* Full queue overlay */}
+      {/* Queue overlay */}
       {showQueue && (
         <div className="fixed inset-0 z-40 bg-[#0a0a0f]/95 backdrop-blur-2xl fade-in flex flex-col">
           <div className="flex items-center justify-between px-5 pt-12 pb-2">
