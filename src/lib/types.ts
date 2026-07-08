@@ -28,7 +28,11 @@ export interface PlayerState {
   nowPlayingView: 'artwork' | 'lyrics';
   audioQuality: AudioQuality;
   downloadFormat: 'mp3' | 'wav' | 'aac';
-  equalizer: { bass: number; mid: number; treble: number; preset: string };
+  equalizer: {
+    bass32: number; bass64: number; bass125: number; lowMid250: number; mid500: number;
+    mid1k: number; mid2k: number; high4k: number; high8k: number; high16k: number;
+    preset: string; mode: 'normal' | 'headphone' | 'speaker';
+  };
   soundEffects: { reverb: number; bassBoost: number; surround3D: number; vocalBoost: number; nightMode: boolean };
   recentlyPlayed: Track[];
 }

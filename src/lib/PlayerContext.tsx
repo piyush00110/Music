@@ -22,7 +22,7 @@ interface PlayerContextType extends PlayerState {
   audioError: string | null;
   setAudioQuality: (q: string) => void;
   setEqualizer: (band: string, val: number) => void;
-  setSoundEffect: (effect: string, val: number) => void;
+  setSoundEffect: (effect: string, val: number | boolean) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -39,6 +39,25 @@ function loadSavedState(): Partial<PlayerState> {
   return {};
 }
 
+function migrateEQ(eq: any): PlayerState['equalizer'] {
+  if (!eq || typeof eq !== 'object') {
+    return { bass32: 0, bass64: 0, bass125: 0, lowMid250: 0, mid500: 0, mid1k: 0, mid2k: 0, high4k: 0, high8k: 0, high16k: 0, preset: 'Flat', mode: 'normal' };
+  }
+  // Migrate from old 3-band format (bass/mid/treble with 0-100 range)
+  if ('bass' in eq && !('bass32' in eq)) {
+    const b = (eq.bass - 50) * 0.48; // Scale 0-100 → -24 to +24
+    const m = (eq.mid - 50) * 0.48;
+    const t = (eq.treble - 50) * 0.48;
+    return { bass32: b, bass64: b, bass125: b * 0.5, lowMid250: m * 0.3, mid500: m, mid1k: m, mid2k: m * 0.3, high4k: t * 0.5, high8k: t, high16k: t, preset: eq.preset || 'Flat', mode: eq.mode || 'normal' };
+  }
+  return {
+    bass32: eq.bass32 ?? 0, bass64: eq.bass64 ?? 0, bass125: eq.bass125 ?? 0,
+    lowMid250: eq.lowMid250 ?? 0, mid500: eq.mid500 ?? 0, mid1k: eq.mid1k ?? 0,
+    mid2k: eq.mid2k ?? 0, high4k: eq.high4k ?? 0, high8k: eq.high8k ?? 0,
+    high16k: eq.high16k ?? 0, preset: eq.preset || 'Flat', mode: eq.mode || 'normal',
+  };
+}
+
 function defaultState(): PlayerState {
   const s = loadSavedState();
   return {
@@ -49,7 +68,7 @@ function defaultState(): PlayerState {
     playbackSpeed: 1, crossfade: false,
     showEqualizer: false, showSoundEffects: false, nowPlayingView: 'artwork',
     audioQuality: s.audioQuality || 'high', downloadFormat: 'mp3',
-    equalizer: { bass: 50, mid: 50, treble: 50, preset: 'Normal' },
+    equalizer: migrateEQ(s.equalizer),
     soundEffects: { reverb: 0, bassBoost: 0, surround3D: 0, vocalBoost: 0, nightMode: false },
   };
 }
@@ -84,9 +103,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const bassRef = useRef<BiquadFilterNode | null>(null);
-  const midRef = useRef<BiquadFilterNode | null>(null);
-  const trebleRef = useRef<BiquadFilterNode | null>(null);
+  const eqRefs = useRef<BiquadFilterNode[]>([]);
+  const crossfeedRef = useRef<GainNode | null>(null);
+  const stereoRef = useRef<StereoPannerNode | null>(null);
+  const convolverRef = useRef<ConvolverNode | null>(null);
+  const dynamicsRef = useRef<DynamicsCompressorNode | null>(null);
   const sRef = useRef<PlayerState>(defaultState());
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ytInitRef = useRef(false);
@@ -100,49 +121,86 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [volume, setVolumeState] = useState(state.volume);
   const [downloading, setDownloading] = useState(false);
 
-  // ── Init audio context for EQ ──────────────────────────────────
+  // ── Init audio context for 10-band EQ + effects ────────────────
+  const EQ_FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
   function initAudioContext(au: HTMLAudioElement) {
     try {
       const ctx = new AudioContext();
       const src = ctx.createMediaElementSource(au);
-      const bass = ctx.createBiquadFilter();
-      bass.type = 'lowshelf';
-      bass.frequency.value = 250;
-      const mid = ctx.createBiquadFilter();
-      mid.type = 'peaking';
-      mid.frequency.value = 1000;
-      mid.Q.value = 1;
-      const treble = ctx.createBiquadFilter();
-      treble.type = 'highshelf';
-      treble.frequency.value = 4000;
-      src.connect(bass);
-      bass.connect(mid);
-      mid.connect(treble);
-      treble.connect(ctx.destination);
+
+      // 10-band peaking EQ
+      const filters: BiquadFilterNode[] = [];
+      for (let i = 0; i < EQ_FREQS.length; i++) {
+        const f = ctx.createBiquadFilter();
+        if (i === 0) { f.type = 'lowshelf'; f.frequency.value = EQ_FREQS[i]; }
+        else if (i === EQ_FREQS.length - 1) { f.type = 'highshelf'; f.frequency.value = EQ_FREQS[i]; }
+        else { f.type = 'peaking'; f.frequency.value = EQ_FREQS[i]; f.Q.value = 1.4; }
+        f.gain.value = 0;
+        filters.push(f);
+      }
+
+      // Stereo crossfeed for headphone mode
+      const cf = ctx.createGain();
+      cf.gain.value = 0;
+
+      // Stereo panner for surround effect
+      const sp = new StereoPannerNode(ctx, { pan: 0 });
+
+      // Dynamic compressor for night mode
+      const dc = ctx.createDynamicsCompressor();
+      dc.threshold.value = 0;
+      dc.ratio.value = 1;
+
+      // Build chain: src → eq[0] → eq[1] → ... → eq[9] → cf → sp → dc → destination
+      src.connect(filters[0]);
+      for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
+      filters[filters.length - 1].connect(cf);
+      cf.connect(sp);
+      sp.connect(dc);
+      dc.connect(ctx.destination);
+
       ctxRef.current = ctx;
       sourceRef.current = src;
-      bassRef.current = bass;
-      midRef.current = mid;
-      trebleRef.current = treble;
-    } catch {}
+      eqRefs.current = filters;
+      crossfeedRef.current = cf;
+      stereoRef.current = sp;
+      dynamicsRef.current = dc;
+    } catch (e) { console.error('initAudioContext error:', e); }
   }
 
   function applyEQ() {
     const eq = sRef.current.equalizer;
-    if (bassRef.current) bassRef.current.gain.value = (eq.bass - 50) / 50;
-    if (midRef.current) midRef.current.gain.value = (eq.mid - 50) / 50;
-    if (trebleRef.current) trebleRef.current.gain.value = (eq.treble - 50) / 50;
+    const gains = [eq.bass32, eq.bass64, eq.bass125, eq.lowMid250, eq.mid500,
+                   eq.mid1k, eq.mid2k, eq.high4k, eq.high8k, eq.high16k];
+    for (let i = 0; i < eqRefs.current.length; i++) {
+      eqRefs.current[i].gain.value = Math.max(-24, Math.min(24, gains[i]));
+    }
+    // Apply mode presets
+    if (eq.mode === 'headphone') {
+      if (eqRefs.current[8] && gains[8] === 0) eqRefs.current[8].gain.value = 2; // slight high boost
+      if (crossfeedRef.current) crossfeedRef.current.gain.value = 0.15; // light crossfeed
+      if (dynamicsRef.current) { dynamicsRef.current.threshold.value = -30; dynamicsRef.current.ratio.value = 3; }
+    } else if (eq.mode === 'speaker') {
+      if (eqRefs.current[0] && gains[0] === 0) eqRefs.current[0].gain.value = 3; // bass boost for speakers
+      if (eqRefs.current[4] && gains[4] === 0) eqRefs.current[4].gain.value = -1; // slight mid cut
+      if (eqRefs.current[8] && gains[8] === 0) eqRefs.current[8].gain.value = 2; // treble boost
+      if (crossfeedRef.current) crossfeedRef.current.gain.value = 0;
+      if (dynamicsRef.current) { dynamicsRef.current.threshold.value = -20; dynamicsRef.current.ratio.value = 2; }
+    } else {
+      if (crossfeedRef.current) crossfeedRef.current.gain.value = 0;
+      if (dynamicsRef.current) { dynamicsRef.current.threshold.value = 0; dynamicsRef.current.ratio.value = 1; }
+    }
   }
 
   function applySoundEffects() {
     const sfx = sRef.current.soundEffects;
-    if (bassRef.current) {
-      const boost = (sfx.bassBoost || 0) / 100;
-      bassRef.current.gain.value = boost;
+    if (stereoRef.current) {
+      stereoRef.current.pan.value = (sfx.surround3D || 0) / 200; // -0.5 to 0.5
     }
-    if (trebleRef.current) {
-      const boost = (sfx.vocalBoost || 0) / 100;
-      trebleRef.current.gain.value = boost;
+    if (dynamicsRef.current && sfx.nightMode) {
+      dynamicsRef.current.threshold.value = -30;
+      dynamicsRef.current.ratio.value = 20;
     }
   }
 
@@ -225,7 +283,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(LS_KEY, JSON.stringify({
         volume, shuffle: state.shuffle, repeat: state.repeat,
         audioQuality: state.audioQuality,
-        equalizer: eq, soundEffects: sfx,
+        equalizer: { ...eq }, soundEffects: { ...sfx },
         recentlyPlayed: sRef.current.recentlyPlayed,
       }));
     } catch {}
@@ -451,14 +509,37 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const setEqualizer = useCallback((band: string, val: number) => {
-    setState(s => ({ ...s, equalizer: { ...s.equalizer, [band]: val } }));
-    applyEQ();
+  const setEqualizer = useCallback((bandOrMode: string, val: number) => {
+    // Handle mode change separately
+    if (bandOrMode === 'mode') {
+      setState(s => ({ ...s, equalizer: { ...s.equalizer, mode: (['normal', 'headphone', 'speaker'] as const)[val] || 'normal' } }));
+      return;
+    }
+    if (bandOrMode === 'preset') {
+      const PRESET_NAMES = ['Flat', 'Bass Boost', 'Treble Boost', 'Vocal', 'Warm', 'Club', 'Headphone', 'Speaker'];
+      const presets: Record<string, Partial<typeof sRef.current.equalizer>> = {
+        'Flat': { bass32: 0, bass64: 0, bass125: 0, lowMid250: 0, mid500: 0, mid1k: 0, mid2k: 0, high4k: 0, high8k: 0, high16k: 0 },
+        'Bass Boost': { bass32: 8, bass64: 6, bass125: 4, lowMid250: 2, mid500: 0, mid1k: 0, mid2k: 0, high4k: 0, high8k: 0, high16k: 0 },
+        'Treble Boost': { bass32: 0, bass64: 0, bass125: 0, lowMid250: 0, mid500: 0, mid1k: 0, mid2k: 2, high4k: 4, high8k: 6, high16k: 8 },
+        'Vocal': { bass32: -2, bass64: -1, bass125: 0, lowMid250: 2, mid500: 4, mid1k: 5, mid2k: 3, high4k: 1, high8k: 0, high16k: 0 },
+        'Warm': { bass32: 5, bass64: 4, bass125: 3, lowMid250: 2, mid500: 0, mid1k: -1, mid2k: -2, high4k: 0, high8k: 2, high16k: 1 },
+        'Club': { bass32: 4, bass64: 3, bass125: 2, lowMid250: 1, mid500: 0, mid1k: 0, mid2k: 1, high4k: 2, high8k: 3, high16k: 0 },
+        'Headphone': { bass32: 2, bass64: 2, bass125: 0, lowMid250: 0, mid500: -1, mid1k: 0, mid2k: 1, high4k: 2, high8k: 3, high16k: 2, mode: 'headphone' },
+        'Speaker': { bass32: 5, bass64: 4, bass125: 3, lowMid250: 1, mid500: -1, mid1k: -2, mid2k: 0, high4k: 2, high8k: 3, high16k: 0, mode: 'speaker' },
+      };
+      const name = PRESET_NAMES[val] || 'Flat';
+      const p = presets[name] || presets['Flat'];
+      setState(s => ({ ...s, equalizer: { ...s.equalizer, ...p, preset: name } }));
+      setTimeout(applyEQ, 50);
+      return;
+    }
+    setState(s => ({ ...s, equalizer: { ...s.equalizer, [bandOrMode]: Math.max(-24, Math.min(24, val)) } }));
+    setTimeout(applyEQ, 50);
   }, []);
 
-  const setSoundEffect = useCallback((effect: string, val: number) => {
+  const setSoundEffect = useCallback((effect: string, val: number | boolean) => {
     setState(s => ({ ...s, soundEffects: { ...s.soundEffects, [effect]: val } }));
-    applySoundEffects();
+    setTimeout(applySoundEffects, 50);
   }, []);
 
   return (
