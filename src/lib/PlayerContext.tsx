@@ -360,6 +360,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const res = await fetch(`/api/stream?id=${youtubeId}`);
       const data = await res.json();
       if (!data.url) throw new Error('No stream URL');
+      if (data.fallback) {
+        window.open(data.url, '_blank');
+        setAudioError('Opening in YouTube...');
+        setState(s => ({ ...s, isPlaying: false }));
+        return;
+      }
       streamingRef.current = true;
       const au = audioRef.current;
       if (au) {
