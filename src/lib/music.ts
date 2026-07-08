@@ -2,11 +2,13 @@ import type { Track } from './types';
 
 const AUDIUS = 'https://discoveryprovider.audius.co';
 
+const AUDIUS_TIMEOUT = 8000;
+
 // ─── YouTube (via local API proxy) ──────────────────────────────
 async function searchYT(query: string): Promise<Track[]> {
   try {
     const url = `/api/youtube/search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.items || []).map((v: any, i: number): Track => ({
@@ -32,7 +34,7 @@ async function searchAudius(query: string, limit = 15): Promise<Track[]> {
   try {
     const res = await fetch(
       `${AUDIUS}/v1/tracks/search?query=${encodeURIComponent(query)}&limit=${limit}`,
-      { signal: AbortSignal.timeout(5000) },
+      { signal: AbortSignal.timeout(AUDIUS_TIMEOUT) },
     );
     if (!res.ok) return [];
     const data = await res.json();
@@ -57,7 +59,7 @@ async function searchAudius(query: string, limit = 15): Promise<Track[]> {
 
 async function getAudiusTrending(): Promise<Track[]> {
   try {
-    const res = await fetch(`${AUDIUS}/v1/tracks/trending?limit=20`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${AUDIUS}/v1/tracks/trending?limit=25`, { signal: AbortSignal.timeout(AUDIUS_TIMEOUT) });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.data || []).map((t: any, i: number): Track => ({
@@ -106,8 +108,8 @@ async function searchDeezer(query: string): Promise<Track[]> {
 
 // ─── Ranking ─────────────────────────────────────────────────────
 function rankTracks(tracks: Track[]): Track[] {
-  const songMin = 30; // skip <30s shorts
-  const songMax = 1200; // skip >20min playlists
+  const songMin = 30;
+  const songMax = 1200;
   return tracks
     .filter(t => t.duration >= songMin && t.duration <= songMax)
     .sort((a, b) => {
@@ -149,12 +151,23 @@ export async function findOnYouTube(title: string, artist: string): Promise<stri
 }
 
 // ─── Trending ────────────────────────────────────────────────────
+const TRENDING_QUERIES = ['new music 2026', 'trending music', 'popular songs', 'viral hits'];
+
 export async function getTrending(): Promise<Track[]> {
-  const [yt, au] = await Promise.all([
-    searchYT('new music 2025').catch(() => [] as Track[]),
-    getAudiusTrending().catch(() => [] as Track[]),
-  ]);
-  return rankTracks([...yt, ...au]).slice(0, 30);
+  const [au] = await Promise.all([getAudiusTrending().catch(() => [] as Track[])]);
+  const all = [...au];
+
+  // Try YouTube searches until we get results
+  for (const q of TRENDING_QUERIES) {
+    if (all.length >= 20) break;
+    const yt = await searchYT(q).catch(() => [] as Track[]);
+    for (const t of yt) {
+      if (all.length >= 30) break;
+      if (!all.some(a => a.youtubeId === t.youtubeId)) all.push(t);
+    }
+  }
+
+  return rankTracks(all).slice(0, 30);
 }
 
 // ─── Recommendations ─────────────────────────────────────────────
@@ -170,9 +183,9 @@ export async function getRecommendations(recentlyPlayed: Track[]): Promise<Track
   if (titles.length) queries.push(titles[0]);
   queries.push('popular music');
 
-  for (let i = 0; i < queries.length; i++) {
+  for (const q of queries) {
     try {
-      const tracks = await searchMusic(queries[i]);
+      const tracks = await searchMusic(q);
       const filtered = tracks.filter(t =>
         !recentlyPlayed.some(r => r.id === t.id) &&
         t.duration >= 30 && t.duration <= 1200
