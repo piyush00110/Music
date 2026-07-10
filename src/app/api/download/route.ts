@@ -26,6 +26,18 @@ async function getStreamUrlFromPage(id: string): Promise<string | null> {
   } catch { return null; }
 }
 
+function sendAudio(buf: ArrayBuffer, safe: string, ext: string) {
+  const mime = ext === 'm4a' ? 'audio/mp4' : 'audio/mpeg';
+  return new NextResponse(buf, {
+    headers: {
+      'Content-Type': mime,
+      'Content-Disposition': `attachment; filename="${safe}.${ext}"`,
+      'Content-Length': String(buf.byteLength),
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
@@ -33,71 +45,70 @@ export async function GET(request: Request) {
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
   const safe = title.replace(/[^\w\s-]/g, '').trim() || 'song';
-  const tmp = path.join(os.tmpdir(), `dl-${id}`);
+  const tmp = path.join(os.tmpdir(), `dl-${id}-${Date.now()}`);
+  const videoUrl = `https://www.youtube.com/watch?v=${id}`;
 
-  // Strategy 1: yt-dlp download best audio as m4a
+  // Strategy 1: yt-dlp bestaudio m4a
   try {
     execSync(
-      `yt-dlp -f bestaudio[ext=m4a] -o "${tmp}.m4a" --no-playlist "https://www.youtube.com/watch?v=${id}"`,
+      `yt-dlp -f "bestaudio[ext=m4a]/bestaudio" -o "${tmp}.%(ext)s" --no-playlist --no-warnings "${videoUrl}"`,
       { timeout: 120000, encoding: 'utf-8', stdio: 'pipe' },
     );
-    if (fs.existsSync(`${tmp}.m4a`)) {
-      const stat = fs.statSync(`${tmp}.m4a`);
-      const buf = fs.readFileSync(`${tmp}.m4a`);
-      fs.unlink(`${tmp}.m4a`, () => {});
-      return new NextResponse(buf, {
-        headers: {
-          'Content-Type': 'audio/mp4',
-          'Content-Disposition': `attachment; filename="${safe}.m4a"`,
-          'Content-Length': String(stat.size),
-          'Cache-Control': 'no-store',
-        },
-      });
-    }
-  } catch {}
-
-  // Strategy 2: yt-dlp stream URL → pipe
-  try {
-    const streamUrl = execSync(
-      `yt-dlp -f bestaudio --get-url "https://www.youtube.com/watch?v=${id}"`,
-      { timeout: 15000, encoding: 'utf-8' },
-    ).trim();
-    if (streamUrl?.startsWith('http')) {
-      const res = await fetch(streamUrl, { signal: AbortSignal.timeout(30000) });
-      if (res.ok) {
-        const buf = await res.arrayBuffer();
-        return new NextResponse(buf, {
-          headers: {
-            'Content-Type': 'audio/mp4',
-            'Content-Disposition': `attachment; filename="${safe}.m4a"`,
-            'Content-Length': String(buf.byteLength),
-            'Cache-Control': 'no-store',
-          },
-        });
+    const files = fs.readdirSync(os.tmpdir()).filter(f => f.startsWith(path.basename(tmp)));
+    for (const f of files) {
+      const fp = path.join(os.tmpdir(), f);
+      if (fs.existsSync(fp)) {
+        const buf = fs.readFileSync(fp);
+        const ext = f.split('.').pop() || 'm4a';
+        fs.unlinkSync(fp);
+        return sendAudio(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), safe, ext);
       }
     }
   } catch {}
 
-  // Strategy 3: scrape YouTube page for stream URL → pipe
+  // Strategy 2: yt-dlp --get-url then pipe
+  try {
+    const streamUrl = execSync(
+      `yt-dlp -f "bestaudio[ext=m4a]/bestaudio" --get-url --no-warnings "${videoUrl}"`,
+      { timeout: 30000, encoding: 'utf-8' },
+    ).trim();
+    if (streamUrl?.startsWith('http')) {
+      const res = await fetch(streamUrl, { signal: AbortSignal.timeout(60000) });
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        const ext = streamUrl.includes('.m4a') || res.headers.get('content-type')?.includes('mp4') ? 'm4a' : 'mp3';
+        return sendAudio(buf, safe, ext);
+      }
+    }
+  } catch {}
+
+  // Strategy 3: scrape YouTube page for stream URL
   const streamUrl = await getStreamUrlFromPage(id);
   if (streamUrl) {
     try {
-      const res = await fetch(streamUrl, { signal: AbortSignal.timeout(30000) });
+      const res = await fetch(streamUrl, { signal: AbortSignal.timeout(60000) });
       if (res.ok) {
         const buf = await res.arrayBuffer();
         const ext = res.headers.get('content-type')?.includes('mp4') ? 'm4a' : 'mp3';
-        return new NextResponse(buf, {
-          headers: {
-            'Content-Type': `audio/${ext === 'm4a' ? 'mp4' : 'mpeg'}`,
-            'Content-Disposition': `attachment; filename="${safe}.${ext}"`,
-            'Content-Length': String(buf.byteLength),
-            'Cache-Control': 'no-store',
-          },
-        });
+        return sendAudio(buf, safe, ext);
       }
     } catch {}
   }
 
-  // Strategy 4: redirect to YouTube
-  return NextResponse.redirect(`https://www.youtube.com/watch?v=${id}`);
+  // Strategy 4: yt-dlp raw pipe
+  try {
+    const buf = execSync(
+      `yt-dlp -f "bestaudio" -o - --no-playlist --no-warnings "${videoUrl}"`,
+      { timeout: 120000, maxBuffer: 50 * 1024 * 1024 },
+    );
+    if (buf && buf.length > 1000) {
+      return sendAudio(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), safe, 'm4a');
+    }
+  } catch {}
+
+  // All strategies failed — return error JSON (NOT a redirect to YouTube)
+  return NextResponse.json(
+    { error: 'Download unavailable. Try again later.' },
+    { status: 503 },
+  );
 }

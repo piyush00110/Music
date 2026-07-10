@@ -7,9 +7,32 @@
  */
 export async function downloadFile(url: string, filename: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
+
+    // Check if server returned an error
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      let msg = 'Download failed';
+      try { msg = JSON.parse(text).error || msg; } catch {}
+      alert(msg);
+      return false;
+    }
+
+    // Check if response is actually HTML (redirect page) instead of audio
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      alert('Download unavailable for this track.');
+      return false;
+    }
+
     const blob = await res.blob();
+
+    // Sanity check: audio files should be > 10KB
+    if (blob.size < 10000) {
+      alert('Download file is too small. The track may be unavailable.');
+      return false;
+    }
+
     const ext = filename.split('.').pop()?.toLowerCase() || 'mp3';
     const mime = blob.type || (ext === 'm4a' ? 'audio/mp4' : 'audio/mpeg');
     const file = new File([blob], filename, { type: mime });
@@ -26,9 +49,7 @@ export async function downloadFile(url: string, filename: string): Promise<boole
         await writable.close();
         return true;
       } catch (e: any) {
-        // User cancelled the dialog
         if (e?.name === 'AbortError') return false;
-        // Fall through to next strategy
       }
     }
 
@@ -40,11 +61,7 @@ export async function downloadFile(url: string, filename: string): Promise<boole
     a.style.display = 'none';
     a.setAttribute('rel', 'noopener');
     document.body.appendChild(a);
-
-    // For iOS Safari: need to trigger within user gesture
     a.click();
-
-    // Cleanup after a short delay
     setTimeout(() => {
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
@@ -52,8 +69,7 @@ export async function downloadFile(url: string, filename: string): Promise<boole
     return true;
   } catch (err) {
     console.error('Download failed:', err);
-    // Final fallback: open URL directly (phone browser will handle it)
-    window.open(url, '_blank');
+    alert('Download failed. Check your connection and try again.');
     return false;
   }
 }
