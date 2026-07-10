@@ -27,8 +27,14 @@ export default function NowPlayingBar() {
         </div>
       )}
 
-      {/* Mobile — YouTube notification style */}
-      <div className="md:hidden">
+      {/* Mobile — tap anywhere to open player, buttons stop propagation */}
+      <Link href="/player" className="md:hidden block"
+        onClick={(e) => {
+          // If a button inside was clicked, don't navigate
+          if ((e.target as HTMLElement).closest('button')) {
+            e.preventDefault();
+          }
+        }}>
         <div className="relative rounded-2xl overflow-hidden"
           style={{
             background: 'linear-gradient(135deg, rgba(40,40,40,0.95) 0%, rgba(30,30,30,0.98) 100%)',
@@ -37,22 +43,19 @@ export default function NowPlayingBar() {
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3)',
           }}>
-          {/* Top row: icon, info, avatar, time */}
+          {/* Top row: icon, info, avatar */}
           <div className="flex items-center gap-3 px-3.5 pt-3 pb-1">
-            {/* YouTube / source icon */}
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/20">
               <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z" />
               </svg>
             </div>
 
-            {/* Song info */}
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold text-white truncate">{currentTrack.artist.name}</p>
               <p className="text-[12px] text-zinc-400 truncate mt-0.5 leading-tight">{currentTrack.title}</p>
             </div>
 
-            {/* Album art avatar */}
             <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
               {artSrc ? (
                 <img src={artSrc} alt="" className="w-full h-full object-cover" />
@@ -67,23 +70,25 @@ export default function NowPlayingBar() {
           {/* Controls row */}
           <div className="flex items-center justify-between px-4 pb-2.5 pt-1">
             <div className="flex items-center gap-1">
-              <button onClick={prev} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 text-zinc-300 hover:text-white transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); prev(); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 text-zinc-300 hover:text-white transition-colors">
                 <span className="material-symbols-outlined text-[18px]">skip_previous</span>
               </button>
-              <button onClick={() => (isPlaying ? pause() : resume())}
+              <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); isPlaying ? pause() : resume(); }}
                 className="w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-all text-white hover:bg-white/10">
                 <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                   {isPlaying ? 'pause' : 'play_arrow'}
                 </span>
               </button>
-              <button onClick={next} className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 text-zinc-300 hover:text-white transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); next(); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 text-zinc-300 hover:text-white transition-colors">
                 <span className="material-symbols-outlined text-[18px]">skip_next</span>
               </button>
             </div>
 
-            <Link href="/player" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-all active:scale-90">
+            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400">
               <span className="material-symbols-outlined text-[16px]">open_in_full</span>
-            </Link>
+            </div>
           </div>
 
           {/* Progress bar at bottom */}
@@ -95,11 +100,16 @@ export default function NowPlayingBar() {
             </div>
           </div>
         </div>
-      </div>
+      </Link>
 
-      {/* Desktop — clean glass bar */}
-      <div className="hidden md:flex items-center gap-4 px-6 py-2.5 frosted-obsidian max-w-screen-2xl mx-auto">
-        <Link href="/player" className="flex items-center gap-3 min-w-0 w-72 group">
+      {/* Desktop — clean glass bar, whole bar clickable */}
+      <Link href="/player" className="hidden md:flex items-center gap-4 px-6 py-2.5 frosted-obsidian max-w-screen-2xl mx-auto"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest('button')) {
+            e.preventDefault();
+          }
+        }}>
+        <div className="flex items-center gap-3 min-w-0 w-72 group">
           <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800 shadow-lg group-hover:shadow-xl transition-shadow">
             {artSrc ? (
               <img src={artSrc} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -113,19 +123,21 @@ export default function NowPlayingBar() {
             <p className="text-sm font-medium text-white truncate group-hover:text-[#D4AF37] transition-colors">{currentTrack.title}</p>
             <p className="text-xs text-zinc-400 truncate">{currentTrack.artist.name}</p>
           </div>
-        </Link>
+        </div>
 
         <div className="flex items-center gap-5 flex-1 max-w-xl mx-auto">
-          <button onClick={prev} className="text-zinc-400 hover:text-white transition-colors active:scale-90">
+          <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); prev(); }}
+            className="text-zinc-400 hover:text-white transition-colors active:scale-90">
             <span className="material-symbols-outlined text-xl">skip_previous</span>
           </button>
-          <button onClick={() => (isPlaying ? pause() : resume())}
+          <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); isPlaying ? pause() : resume(); }}
             className="w-10 h-10 rounded-full sunburst-btn flex items-center justify-center text-black active:scale-95 transition-all">
             <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
               {isPlaying ? 'pause' : 'play_arrow'}
             </span>
           </button>
-          <button onClick={next} className="text-zinc-400 hover:text-white transition-colors active:scale-90">
+          <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); next(); }}
+            className="text-zinc-400 hover:text-white transition-colors active:scale-90">
             <span className="material-symbols-outlined text-xl">skip_next</span>
           </button>
         </div>
@@ -137,11 +149,11 @@ export default function NowPlayingBar() {
         </div>
 
         <div className="flex items-center gap-2 w-28 justify-end">
-          <Link href="/player" className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all text-zinc-400 hover:text-[#D4AF37]">
+          <div className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all text-zinc-400 hover:text-[#D4AF37]">
             <span className="material-symbols-outlined text-[18px]">open_in_full</span>
-          </Link>
+          </div>
         </div>
-      </div>
+      </Link>
     </div>
   );
 }

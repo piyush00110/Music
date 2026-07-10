@@ -336,6 +336,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (t) doPlay(t, s.queue);
   }
 
+  // ── Media Session API for background playback ──────────────────
+  function updateMediaSession(track: Track) {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const artwork = [
+      { src: track.album.cover_medium || track.album.cover_small || '', sizes: '512x512', type: 'image/jpeg' },
+    ];
+    if (track.youtubeId) {
+      artwork.push({ src: `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`, sizes: '512x512', type: 'image/jpeg' });
+    }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title,
+      artist: track.artist.name,
+      album: track.album.title || '',
+      artwork: artwork.filter(a => a.src),
+    });
+    navigator.mediaSession.setActionHandler('play', () => resume());
+    navigator.mediaSession.setActionHandler('pause', () => pause());
+    navigator.mediaSession.setActionHandler('previoustrack', () => prev());
+    navigator.mediaSession.setActionHandler('nexttrack', () => next());
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime != null) seek(details.seekTime);
+    });
+    navigator.mediaSession.setActionHandler('stop', () => pause());
+  }
+
   async function doPlay(track: Track, q?: Track[]) {
     setAudioError(null);
     const queue = q || [track];
@@ -346,6 +371,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       if (rp.length > 50) rp.length = 50;
       return { ...s, currentTrack: track, isPlaying: true, queue, queueIndex: idx >= 0 ? idx : 0, progress: 0, recentlyPlayed: rp };
     });
+    updateMediaSession(track);
     applyEQ();
     applySoundEffects();
 
@@ -445,6 +471,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (streamingRef.current || useAudioSource(s.currentTrack)) audioRef.current?.pause();
     else ytPlayerRef.current?.pauseVideo();
     setState(s => ({ ...s, isPlaying: false }));
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   }, []);
   const resume = useCallback(() => {
     const s = sRef.current;
@@ -453,6 +480,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audioRef.current?.play().catch(() => {});
     } else ytPlayerRef.current?.playVideo();
     setState(s => ({ ...s, isPlaying: true }));
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
   }, []);
   const next = useCallback(() => doNext(), []);
   const prev = useCallback(() => doPrev(), []);
