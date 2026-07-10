@@ -59,7 +59,6 @@ export default function PlayerPage() {
   const [showTooltip, setShowTooltip] = useState(false);
   const [dominantColor, setDominantColor] = useState('#D4AF37');
   const [accentColor, setAccentColor] = useState('#FFBF00');
-  const [glowIntensity, setGlowIntensity] = useState(0.3);
   const progressRef = useRef<HTMLDivElement>(null);
 
   const pct = duration > 0 ? (progress / duration) * 100 : 0;
@@ -78,19 +77,7 @@ export default function PlayerPage() {
     });
   }, [artSrc]);
 
-  // Glow pulses when playing
-  useEffect(() => {
-    if (!isPlaying) { setGlowIntensity(0.3); return; }
-    let frame: number;
-    let t = 0;
-    const animate = () => {
-      t += 0.02;
-      setGlowIntensity(0.3 + Math.sin(t) * 0.2);
-      frame = requestAnimationFrame(animate);
-    };
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [isPlaying]);
+  // Glow pulses via CSS animation (no React state needed)
 
   const updateSeekPosition = useCallback((clientX: number) => {
     const rect = progressRef.current?.getBoundingClientRect();
@@ -278,7 +265,8 @@ export default function PlayerPage() {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full pointer-events-none transition-all duration-1000"
           style={{
             background: `radial-gradient(circle, ${dominantColor}20 0%, transparent 70%)`,
-            opacity: glowIntensity,
+            opacity: 0.3,
+            animation: isPlaying ? 'glow-pulse 3s ease-in-out infinite' : 'none',
             filter: 'blur(80px)',
           }} />
 
@@ -421,7 +409,8 @@ export default function PlayerPage() {
               style={{
                 background: dominantColor,
                 filter: 'blur(40px)',
-                opacity: glowIntensity * 0.5,
+                opacity: isPlaying ? 0.25 : 0.1,
+                animation: isPlaying ? 'glow-pulse 3s ease-in-out infinite' : 'none',
               }} />
 
             <div className="w-[240px] h-[240px] md:w-[280px] md:h-[280px] rounded-2xl overflow-hidden relative group"

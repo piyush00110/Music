@@ -48,7 +48,22 @@ export default function Visualizer({ isPlaying, barCount = 48 }: Props) {
       animRef.current = requestAnimationFrame(draw);
     };
 
-    draw();
+    if (isPlaying) {
+      draw();
+    } else {
+      // Draw one static frame when paused
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const barWidth = canvas.width / barCount;
+      const gap = 1;
+      for (let i = 0; i < barCount; i++) {
+        const h = bars[i] * canvas.height * 0.2;
+        const x = i * barWidth + gap / 2;
+        const w = barWidth - gap;
+        ctx.fillStyle = '#D4AF37';
+        ctx.globalAlpha = 0.2;
+        ctx.fillRect(x, canvas.height - h, w, h);
+      }
+    }
 
     return () => cancelAnimationFrame(animRef.current);
   }, [isPlaying, barCount]);
