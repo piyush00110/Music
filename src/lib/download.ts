@@ -1,35 +1,27 @@
 'use client';
 
-/**
- * Robust file download that works on both PC and phone.
- * - PC: uses File System Access API (showSaveFilePicker) for "Save As" dialog
- * - Phone: fetches blob, creates object URL, triggers via hidden link
- */
 export async function downloadFile(url: string, filename: string): Promise<boolean> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
 
-    // Check if server returned an error
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       let msg = 'Download failed';
       try { msg = JSON.parse(text).error || msg; } catch {}
-      alert(msg);
+      showToast(msg, 'error');
       return false;
     }
 
-    // Check if response is actually HTML (redirect page) instead of audio
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('text/html')) {
-      alert('Download unavailable for this track.');
+      showToast('Download unavailable for this track.', 'error');
       return false;
     }
 
     const blob = await res.blob();
 
-    // Sanity check: audio files should be > 10KB
     if (blob.size < 10000) {
-      alert('Download file is too small. The track may be unavailable.');
+      showToast('Track too short or unavailable.', 'error');
       return false;
     }
 
@@ -37,7 +29,7 @@ export async function downloadFile(url: string, filename: string): Promise<boole
     const mime = blob.type || (ext === 'm4a' ? 'audio/mp4' : 'audio/mpeg');
     const file = new File([blob], filename, { type: mime });
 
-    // Strategy 1: File System Access API (PC Chrome/Edge - shows "Save As" dialog)
+    // PC: File System Access API ("Save As" dialog)
     if ('showSaveFilePicker' in window) {
       try {
         const handle = await (window as any).showSaveFilePicker({
@@ -47,36 +39,34 @@ export async function downloadFile(url: string, filename: string): Promise<boole
         const writable = await handle.createWritable();
         await writable.write(file);
         await writable.close();
+        showToast('Downloaded successfully!', 'success');
         return true;
       } catch (e: any) {
         if (e?.name === 'AbortError') return false;
       }
     }
 
-    // Strategy 2: Blob URL with hidden link (works on phone + most browsers)
+    // Phone / other browsers: blob download
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;
     a.download = filename;
     a.style.display = 'none';
-    a.setAttribute('rel', 'noopener');
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
     }, 1000);
+    showToast('Download started!', 'success');
     return true;
   } catch (err) {
     console.error('Download failed:', err);
-    alert('Download failed. Check your connection and try again.');
+    showToast('Download failed. Try again.', 'error');
     return false;
   }
 }
 
-/**
- * Build download URL for a track
- */
 export function getTrackDownloadUrl(track: { youtubeId?: string; preview?: string; title: string }): string | null {
   if (track.youtubeId) {
     return `/api/download?id=${track.youtubeId}&title=${encodeURIComponent(track.title)}`;
@@ -87,13 +77,33 @@ export function getTrackDownloadUrl(track: { youtubeId?: string; preview?: strin
   return null;
 }
 
-/**
- * Get safe filename from track title
- */
 export function getSafeFilename(title: string, ext: string = 'm4a'): string {
-  const safe = title
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, ' ');
+  const safe = title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, ' ');
   return `${safe || 'song'}.${ext}`;
+}
+
+function showToast(msg: string, type: 'success' | 'error') {
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById('dl-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'dl-toast';
+  toast.textContent = msg;
+  toast.style.cssText = `
+    position: fixed; bottom: 140px; left: 50%; transform: translateX(-50%);
+    padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 500;
+    z-index: 99999; pointer-events: none; opacity: 0;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    ${type === 'success'
+      ? 'background: rgba(34,197,94,0.9); color: white;'
+      : 'background: rgba(239,68,68,0.9); color: white;'}
+  `;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => { toast.style.opacity = '1'; });
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
 }
