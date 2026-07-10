@@ -3,6 +3,7 @@
 import type { Track } from '@/lib/types';
 import { usePlayer } from '@/lib/PlayerContext';
 import { useState } from 'react';
+import { downloadFile, getTrackDownloadUrl, getSafeFilename } from '@/lib/download';
 
 interface Props {
   track: Track;
@@ -16,37 +17,14 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
   const isCurrentTrack = currentTrack?.id === track.id;
   const [dl, setDl] = useState(false);
 
-  function triggerDownload(url: string, filename: string) {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
-
   const downloadTrack = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (track.youtubeId) {
-      setDl(true);
-      triggerDownload(
-        `/api/download?id=${track.youtubeId}&title=${encodeURIComponent(track.title)}`,
-        `${track.title.replace(/[^\w\s]/g, '').trim() || 'song'}.m4a`,
-      );
-      setTimeout(() => setDl(false), 5000);
-      return;
-    }
-    const url = track.preview;
+    const url = getTrackDownloadUrl(track);
     if (!url) return;
     setDl(true);
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-      const blob = await res.blob();
-      const ext = blob.type.includes('mp4') ? 'm4a' : 'mp3';
-      const objUrl = URL.createObjectURL(blob);
-      triggerDownload(objUrl, `${track.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.${ext}`);
-      setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
-    } catch { window.open(url, '_blank'); }
+    const ext = track.youtubeId ? 'm4a' : (track.preview?.includes('mp4') ? 'm4a' : 'mp3');
+    const filename = getSafeFilename(track.title, ext);
+    await downloadFile(url, filename);
     setDl(false);
   };
 

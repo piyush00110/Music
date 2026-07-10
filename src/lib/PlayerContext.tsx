@@ -3,6 +3,7 @@
 import { createContext, useContext, useRef, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { Track, PlayerState } from './types';
 import { findOnYouTube } from './music';
+import { downloadFile, getTrackDownloadUrl, getSafeFilename } from './download';
 
 interface PlayerContextType extends PlayerState {
   play: (track: Track, queue?: Track[]) => void;
@@ -506,38 +507,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const clearQueue = useCallback(() => setState(s => ({ ...s, queue: [], queueIndex: -1 })), []);
 
   // ── Download ──────────────────────────────────────────────────
-  function triggerDownload(url: string, filename: string) {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
-
   const downloadCurrentTrack = useCallback(async () => {
     const t = sRef.current.currentTrack;
     if (!t) return;
-    if (t.youtubeId) {
-      setDownloading(true);
-      triggerDownload(
-        `/api/download?id=${t.youtubeId}&title=${encodeURIComponent(t.title)}`,
-        `${t.title.replace(/[^\w\s]/g, '').trim() || 'song'}.m4a`,
-      );
-      setTimeout(() => setDownloading(false), 5000);
-      return;
-    }
-    if (!t.preview) return;
     setDownloading(true);
-    try {
-      const res = await fetch(t.preview, { signal: AbortSignal.timeout(30000) });
-      const blob = await res.blob();
-      const ext = blob.type.includes('mp4') ? 'm4a' : 'mp3';
-      const objUrl = URL.createObjectURL(blob);
-      const fn = `${t.title.replace(/[^\w\s]/g, '').trim() || 'audio'}.${ext}`;
-      triggerDownload(objUrl, fn);
-      setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
-    } catch { window.open(t.preview, '_blank'); }
+    const url = getTrackDownloadUrl(t);
+    if (url) {
+      const ext = t.youtubeId ? 'm4a' : (t.preview?.includes('mp4') ? 'm4a' : 'mp3');
+      const filename = getSafeFilename(t.title, ext);
+      await downloadFile(url, filename);
+    }
     setDownloading(false);
   }, []);
 
