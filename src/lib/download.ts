@@ -13,21 +13,20 @@ export async function downloadFile(url: string, filename: string): Promise<boole
     }
 
     const contentType = res.headers.get('content-type') || '';
-    if (contentType.includes('text/html')) {
+    if (contentType.includes('text/html') || contentType.includes('application/json')) {
       showToast('Download unavailable for this track.', 'error');
       return false;
     }
 
     const blob = await res.blob();
 
-    if (blob.size < 10000) {
-      showToast('Track too short or unavailable.', 'error');
+    if (blob.size < 5000) {
+      showToast('Track unavailable.', 'error');
       return false;
     }
 
     const ext = filename.split('.').pop()?.toLowerCase() || 'mp3';
     const mime = blob.type || (ext === 'm4a' ? 'audio/mp4' : 'audio/mpeg');
-    const file = new File([blob], filename, { type: mime });
 
     // PC: File System Access API ("Save As" dialog)
     if ('showSaveFilePicker' in window) {
@@ -37,16 +36,16 @@ export async function downloadFile(url: string, filename: string): Promise<boole
           types: [{ description: 'Audio', accept: { [mime]: [`.${ext}`] } }],
         });
         const writable = await handle.createWritable();
-        await writable.write(file);
+        await writable.write(new File([blob], filename, { type: mime }));
         await writable.close();
-        showToast('Downloaded successfully!', 'success');
+        showToast('Downloaded!', 'success');
         return true;
       } catch (e: any) {
         if (e?.name === 'AbortError') return false;
       }
     }
 
-    // Phone / other browsers: blob download
+    // Phone / fallback: blob URL download
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;
@@ -61,8 +60,10 @@ export async function downloadFile(url: string, filename: string): Promise<boole
     showToast('Download started!', 'success');
     return true;
   } catch (err) {
-    console.error('Download failed:', err);
-    showToast('Download failed. Try again.', 'error');
+    console.error('Download error:', err);
+    // Last resort: try opening the API URL directly in a new tab
+    // The browser will handle the download natively
+    window.open(url, '_blank');
     return false;
   }
 }
