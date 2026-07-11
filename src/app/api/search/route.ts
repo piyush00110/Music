@@ -32,7 +32,7 @@ async function searchYT(query: string) {
       'X-YouTube-Client-Version': '2.20250101.00.00',
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(6000),
   });
   if (!res.ok) return null;
   const data = await res.json();
@@ -64,7 +64,7 @@ async function searchHTML(query: string) {
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
     },
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(6000),
   });
   if (!res.ok) return null;
   const html = await res.text();
@@ -156,10 +156,17 @@ export async function GET(request: Request) {
     });
   }
 
-  // YouTube (2 strategies) - add "official" for better music matching
+  // YouTube InnerTube + HTML scrape in parallel for speed
   let yt = await searchYT(query).catch(() => null);
-  if (!yt?.length) yt = await searchHTML(query).catch(() => null);
-  // If few results, try with "official audio" suffix
+  let ytHtml: any[] | null = null;
+  if (!yt?.length) {
+    [yt, ytHtml] = await Promise.all([
+      searchYT(query).catch(() => null),
+      searchHTML(query).catch(() => null),
+    ]);
+    yt = yt || ytHtml;
+  }
+  // If few results, try with "official audio" suffix (only if needed)
   if (!yt || yt.length < 3) {
     const yt2 = await searchYT(`${query} official audio`).catch(() => null);
     if (yt2?.length) yt = [...(yt || []), ...yt2];

@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import type { Track } from './types';
 
 const LS_HISTORY = 'aurelia-search-history';
@@ -63,8 +63,10 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     try { localStorage.removeItem(LS_HISTORY); } catch {}
   }, []);
 
+  const contextValue = useMemo(() => ({ query, results, loading, searchHistory, setQuery, setResults, setLoading, addToHistory, removeFromHistory, clearHistory }), [query, results, loading, searchHistory, setQuery, setResults, setLoading, addToHistory, removeFromHistory, clearHistory]);
+
   return (
-    <SearchContext.Provider value={{ query, results, loading, searchHistory, setQuery, setResults, setLoading, addToHistory, removeFromHistory, clearHistory }}>
+    <SearchContext.Provider value={contextValue}>
       {children}
     </SearchContext.Provider>
   );

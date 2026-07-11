@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useRef, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useRef, useState, useCallback, useEffect, useMemo, memo, type ReactNode } from 'react';
 import type { Track, PlayerState } from './types';
 import { findOnYouTube } from './music';
 import { downloadFile, getTrackDownloadUrl, getSafeFilename } from './download';
@@ -204,6 +204,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const preGainRef = useRef<GainNode | null>(null);
   const exciterRef = useRef<WaveShaperNode | null>(null);
+  const liveSpectrumRef = useRef<Uint8Array>(new Uint8Array(64));
 
   // ── Professional reverb IR: multi-room with early reflections, pre-delay, and diffusion ──
   function createReverbIR(ctx: AudioContext, duration = 2.8, decay = 2.5): AudioBuffer {
@@ -518,19 +519,33 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, 500);
   }
 
-  // ── Spectrum visualizer loop (only when playing) ──
+  // ── Spectrum visualizer: throttled to 15fps, only when playing ──
   useEffect(() => {
     let raf: number;
-    const update = () => {
+    let lastUpdate = 0;
+    const FRAME_INTERVAL = 1000 / 15; // 15fps (was 60fps — causes massive lag)
+    const update = (timestamp: number) => {
+      raf = requestAnimationFrame(update);
+      if (timestamp - lastUpdate < FRAME_INTERVAL) return;
+      lastUpdate = timestamp;
       const analyser = analyserRef.current;
       if (analyser && sRef.current.isPlaying) {
         const bufLen = analyser.frequencyBinCount;
         const data = new Uint8Array(bufLen);
         analyser.getByteFrequencyData(data);
         const step = Math.floor(bufLen / 64);
+        let changed = false;
+        const prev = liveSpectrumRef.current;
         const sampled = new Uint8Array(64);
-        for (let i = 0; i < 64; i++) sampled[i] = data[i * step] || 0;
-        setLiveSpectrum(sampled);
+        for (let i = 0; i < 64; i++) {
+          const val = data[i * step] || 0;
+          sampled[i] = val;
+          if (val !== prev[i]) changed = true;
+        }
+        if (changed) {
+          liveSpectrumRef.current = sampled;
+          setLiveSpectrum(sampled);
+        }
       }
       raf = requestAnimationFrame(update);
     };
@@ -610,7 +625,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
     if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(volume * 100);
-    setState(s => ({ ...s, volume }));
+    // Only update state if volume actually changed in state (avoid circular update)
+    if (sRef.current.volume !== volume) {
+      setState(s => ({ ...s, volume }));
+    }
   }, [volume]);
 
   useEffect(() => {
@@ -651,12 +669,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const iv = setInterval(() => {
       const s = sRef.current;
       if (!s.isPlaying || !s.currentTrack) return;
+      let currentTime = 0;
       if (streamingRef.current || useAudioSource(s.currentTrack)) {
-        if (audioRef.current) setState(prev => ({ ...prev, progress: audioRef.current!.currentTime }));
+        currentTime = audioRef.current?.currentTime || 0;
       } else {
-        try { if (ytPlayerRef.current?.getCurrentTime) setState(prev => ({ ...prev, progress: ytPlayerRef.current.getCurrentTime() })); } catch {}
+        try { currentTime = ytPlayerRef.current?.getCurrentTime?.() || 0; } catch {}
       }
-    }, 250);
+      // Only update state if progress changed by more than 0.3s (avoid constant re-renders)
+      if (Math.abs(currentTime - s.progress) > 0.3) {
+        setState(prev => ({ ...prev, progress: currentTime }));
+      }
+    }, 500);
     return () => clearInterval(iv);
   }, []);
 
@@ -1056,19 +1079,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (ytPlayerRef.current?.setPlaybackRate) ytPlayerRef.current.setPlaybackRate(clamped);
   }, []);
 
+  const contextValue = useMemo<PlayerContextType>(() => ({
+    ...state, audioError, downloading, liveSpectrum, loudnessDb,
+    play, pause, resume, next, prev, setVolume, seek,
+    toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue,
+    downloadCurrentTrack, setAudioQuality, setEqualizer, setSoundEffect,
+    toggleCrossfade, setCrossfadeDuration, setPlaybackSpeed,
+    toggleFavorite, isFavorite,
+    audioContext: ctxRef.current,
+    eqFilters: eqRefs.current,
+    masterGain: masterGainRef.current,
+    analyserNode: analyserRef.current,
+  }), [state, audioError, downloading, liveSpectrum, loudnessDb, play, pause, resume, next, prev, setVolume, seek, toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue, downloadCurrentTrack, setAudioQuality, setEqualizer, setSoundEffect, toggleCrossfade, setCrossfadeDuration, setPlaybackSpeed, toggleFavorite, isFavorite]);
+
   return (
-    <PlayerContext.Provider value={{
-      ...state, audioError, downloading, liveSpectrum, loudnessDb,
-      play, pause, resume, next, prev, setVolume, seek,
-      toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue,
-      downloadCurrentTrack, setAudioQuality, setEqualizer, setSoundEffect,
-      toggleCrossfade, setCrossfadeDuration, setPlaybackSpeed,
-      toggleFavorite, isFavorite,
-      audioContext: ctxRef.current,
-      eqFilters: eqRefs.current,
-      masterGain: masterGainRef.current,
-      analyserNode: analyserRef.current,
-    } as PlayerContextType}>
+    <PlayerContext.Provider value={contextValue}>
       {children}
     </PlayerContext.Provider>
   );

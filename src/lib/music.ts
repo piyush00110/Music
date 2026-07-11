@@ -140,7 +140,7 @@ export async function getRecommendations(recentlyPlayed: Track[]): Promise<Track
 
 // ─── YouTube search for non-YouTube tracks ───────────────────────
 export async function findOnYouTube(title: string, artist: string): Promise<string | null> {
-  // Try multiple search strategies for best match
+  // Try multiple search strategies for best match (optimized: max 2 calls)
   const cleanTitle = title.replace(/\(.*?\)|\[.*?\]| Official.*| HD.*| 4K.*/gi, '').trim();
   const cleanArtist = artist.replace(/Official.*|Topic|VEVO/gi, '').trim();
   
@@ -149,15 +149,10 @@ export async function findOnYouTube(title: string, artist: string): Promise<stri
   const match1 = tracks1.find(t => t.source === 'youtube' && t.youtubeId);
   if (match1?.youtubeId) return match1.youtubeId;
 
-  // Strategy 2: Just the title (if artist search fails)
-  const tracks2 = await searchMusic(cleanTitle);
+  // Strategy 2: Just the title + "official audio" (combined to save one API call)
+  const tracks2 = await searchMusic(`${cleanTitle} official audio`);
   const match2 = tracks2.find(t => t.source === 'youtube' && t.youtubeId);
   if (match2?.youtubeId) return match2.youtubeId;
-
-  // Strategy 3: "title official audio"
-  const tracks3 = await searchMusic(`${cleanTitle} official audio`);
-  const match3 = tracks3.find(t => t.source === 'youtube' && t.youtubeId);
-  if (match3?.youtubeId) return match3.youtubeId;
 
   return null;
 }

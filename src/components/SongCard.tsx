@@ -2,7 +2,7 @@
 
 import type { Track } from '@/lib/types';
 import { usePlayer } from '@/lib/PlayerContext';
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { downloadFile, getTrackDownloadUrl, getSafeFilename } from '@/lib/download';
 
 interface Props {
@@ -12,7 +12,7 @@ interface Props {
   showIndex?: boolean;
 }
 
-export default function SongCard({ track, index, queue, showIndex }: Props) {
+export default memo(function SongCard({ track, index, queue, showIndex }: Props) {
   const { play, currentTrack, isPlaying, pause, resume, addToQueue } = usePlayer();
   const isCurrentTrack = currentTrack?.id === track.id;
   const [dl, setDl] = useState(false);
@@ -112,4 +112,4 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
       </div>
     </div>
   );
-}
+});
