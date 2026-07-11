@@ -308,7 +308,7 @@ function SearchContent() {
         {showSuggestions && query.length >= 2 && (
           <div
             ref={suggestionsRef}
-            className="absolute top-full left-0 right-0 mt-2 bg-zinc-900/98 backdrop-blur-xl rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden z-50 max-h-[70vh] overflow-y-auto"
+            className="absolute top-full left-0 right-0 mt-2 bg-zinc-900/98 backdrop-blur-xl rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden z-[60] max-h-[70vh] overflow-y-auto"
           >
             {/* Suggestion tracks from Deezer */}
             {suggestionTracks.length > 0 && (
@@ -407,10 +407,7 @@ function SearchContent() {
                       className="material-symbols-outlined text-zinc-600 text-base hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={e => {
                         e.stopPropagation();
-                        // Remove from history
-                        const newHistory = sc.searchHistory.filter(h => h !== term);
-                        try { localStorage.setItem('aurelia-search-history', JSON.stringify(newHistory)); } catch {}
-                        window.location.reload();
+                        sc.removeFromHistory(term);
                       }}
                     >
                       close

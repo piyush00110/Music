@@ -163,6 +163,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const pendingPlayRef = useRef<string | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [state, setState] = useState<PlayerState>(defaultState);
   const [audioError, setAudioError] = useState<string | null>(null);
   sRef.current = state;
@@ -740,16 +741,63 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function fallbackToYouTube(track: Track, queue?: Track[]) {
+    // Try YouTube search as fallback when preview fails
+    try {
+      const found = await findOnYouTube(track.title, track.artist.name);
+      if (found) {
+        track.youtubeId = found;
+        // Try stream API
+        try {
+          const res = await fetch(`/api/stream?id=${found}`);
+          const data = await res.json();
+          if (data.url && !data.fallback) {
+            streamingRef.current = true;
+            const au = audioRef.current;
+            if (au) {
+              au.src = data.url;
+              au.volume = sRef.current.volume;
+              au.onerror = null;
+              ensureAudioContext();
+              au.onended = () => { streamingRef.current = false; onEnded(); };
+              await au.play();
+              startAutoGainAnalysis();
+              setState(s => ({ ...s, currentTrack: track }));
+              return;
+            }
+          }
+        } catch {}
+
+        // Fallback: YT IFrame
+        if (playerReadyRef.current && ytPlayerRef.current) {
+          try {
+            ytPlayerRef.current.stopVideo();
+            ytPlayerRef.current.loadVideoById(found, 0, 'default');
+            audioRef.current!.src = '';
+            setState(s => ({ ...s, currentTrack: track }));
+            return;
+          } catch {}
+        }
+        pendingPlayRef.current = found;
+        setState(s => ({ ...s, currentTrack: track }));
+        return;
+      }
+    } catch {}
+    setAudioError('Track unavailable');
+    setState(s => ({ ...s, isPlaying: false }));
+  }
+
   async function doPlay(track: Track, q?: Track[]) {
     setAudioError(null);
     ensureAudioContext();
     requestWakeLock();
     if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
+    if (pendingPlayTimeoutRef.current) { clearTimeout(pendingPlayTimeoutRef.current); pendingPlayTimeoutRef.current = null; }
 
     // ── STOP old playback FIRST to prevent "plays old song" bug ──
     if (streamingRef.current) {
       const au = audioRef.current;
-      if (au) { au.pause(); au.src = ''; au.onended = null; }
+      if (au) { au.pause(); au.src = ''; au.onended = null; au.onerror = null; }
       streamingRef.current = false;
     }
     if (ytPlayerRef.current) {
@@ -811,6 +859,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return;
       }
       pendingPlayRef.current = track.youtubeId;
+      // Timeout: if YT IFrame doesn't start within 8s, show error
+      pendingPlayTimeoutRef.current = setTimeout(() => {
+        if (pendingPlayRef.current === track.youtubeId) {
+          pendingPlayRef.current = null;
+          setAudioError('YouTube player unavailable. Try again.');
+          setState(s => ({ ...s, isPlaying: false }));
+        }
+      }, 8000);
       return;
     }
 
@@ -824,54 +880,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       au.volume = sRef.current.volume;
       ensureAudioContext();
       au.onended = () => { streamingRef.current = false; onEnded(); };
+      au.onerror = () => {
+        // CORS or network error — try YouTube search as fallback
+        streamingRef.current = false;
+        fallbackToYouTube(track, queue);
+      };
       try {
         await au.play();
         startAutoGainAnalysis();
         return;
-      } catch {}
+      } catch {
+        // Playback failed — try YouTube search as fallback
+        streamingRef.current = false;
+      }
     }
 
     // Priority 2: Search YouTube for a matching video
-    try {
-      const found = await findOnYouTube(track.title, track.artist.name);
-      if (found) {
-        track.youtubeId = found;
-        // Try stream first for full audio processing
-        try {
-          const res = await fetch(`/api/stream?id=${found}`);
-          const data = await res.json();
-          if (data.url && !data.fallback) {
-            streamingRef.current = true;
-            const au = audioRef.current;
-            if (au) {
-              au.src = data.url;
-              au.volume = sRef.current.volume;
-              ensureAudioContext();
-              au.onended = () => { streamingRef.current = false; onEnded(); };
-              await au.play();
-              startAutoGainAnalysis();
-              return;
-            }
-          }
-        } catch {}
-
-        // Fallback: YT IFrame
-        if (playerReadyRef.current && ytPlayerRef.current) {
-          try {
-            ytPlayerRef.current.stopVideo();
-            ytPlayerRef.current.loadVideoById(found, 0, 'default');
-            audioRef.current!.src = '';
-            return;
-          } catch {}
-        }
-        if (ytFailedRef.current) { playViaStream(found, queue, idx); return; }
-        pendingPlayRef.current = found;
-        return;
-      }
-    } catch {}
-
-    setAudioError('Not available');
-    setState(s => ({ ...s, isPlaying: false }));
+    await fallbackToYouTube(track, queue);
   }
 
   async function playViaStream(youtubeId: string, queue?: Track[], idx?: number) {

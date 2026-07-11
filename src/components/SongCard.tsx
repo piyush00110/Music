@@ -53,7 +53,7 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
         transition-all duration-200 active:scale-[0.98]
         ${isCurrentTrack
           ? 'active-track-glow'
-          : 'hover:bg-white/[0.04] border border-transparent'
+          : 'hover:bg-[var(--bg-surface-hover)] border border-transparent'
         }
       `}
     >
@@ -63,7 +63,7 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
         </span>
       )}
 
-      <div className="w-11 h-11 md:w-12 md:h-12 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800/50 shadow-md">
+      <div className="w-11 h-11 md:w-12 md:h-12 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--bg-surface)] shadow-md">
         {artSrc ? (
           <img src={artSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
         ) : (
@@ -74,10 +74,10 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className={`text-[13px] md:text-sm font-medium truncate transition-colors ${isCurrentTrack ? 'text-[#D4AF37]' : 'text-white group-hover:text-[#D4AF37]'}`}>
+        <p className={`text-[13px] md:text-sm font-medium truncate transition-colors ${isCurrentTrack ? 'text-[#D4AF37]' : 'text-[var(--text-primary)] group-hover:text-[#D4AF37]'}`}>
           {track.title}
         </p>
-        <p className="text-[11px] md:text-xs text-zinc-400 truncate mt-0.5">{track.artist.name}</p>
+        <p className="text-[11px] md:text-xs text-[var(--text-secondary)] truncate mt-0.5">{track.artist.name}</p>
       </div>
 
       <div className="flex items-center gap-1">

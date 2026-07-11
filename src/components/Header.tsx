@@ -13,7 +13,7 @@ export default function Header() {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#FFBF00] flex items-center justify-center shadow-lg shadow-[#D4AF37]/20 group-hover:shadow-[#D4AF37]/40 transition-all duration-300 group-hover:scale-105">
             <span className="material-symbols-outlined text-black text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>graphic_eq</span>
           </div>
-          <span className="text-base font-[family-name:var(--font-serif)] text-white tracking-wide hidden sm:block">
+          <span className="text-base font-[family-name:var(--font-serif)] text-[var(--text-primary)] tracking-wide hidden sm:block">
             AURELIA
           </span>
         </Link>
@@ -30,7 +30,7 @@ export default function Header() {
                 className={`relative px-4 py-2 rounded-full text-xs font-medium tracking-wider uppercase transition-all duration-300 ${
                   active
                     ? 'text-[#D4AF37] bg-[#D4AF37]/10'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]'
                 }`}>
                 {item.label}
                 {active && (
@@ -43,7 +43,7 @@ export default function Header() {
 
         <div className="flex items-center gap-2">
           <Link href="/search"
-            className="md:hidden w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all active:scale-90 border border-white/5">
+            className="md:hidden w-9 h-9 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] flex items-center justify-center transition-all active:scale-90 border border-[var(--border-subtle)]">
             <span className="material-symbols-outlined text-[20px] text-[#D4AF37]">search</span>
           </Link>
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D4AF37]/20 to-[#FFBF00]/10 flex items-center justify-center border border-[#D4AF37]/20 hover:border-[#D4AF37]/40 transition-all cursor-pointer">

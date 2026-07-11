@@ -52,13 +52,13 @@ export default function LibraryPage() {
             <span className="material-symbols-outlined text-black text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Your Library</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">Your Library</h1>
             {items.length > 0 && (
-              <p className="text-[10px] text-zinc-500 mt-0.5 uppercase tracking-[0.15em]">{items.length} tracks saved</p>
+              <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5 uppercase tracking-[0.15em]">{items.length} tracks saved</p>
             )}
           </div>
         </div>
-        <button onClick={() => router.push('/search')} className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all active:scale-90 border border-white/5">
+        <button onClick={() => router.push('/search')} className="w-9 h-9 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] flex items-center justify-center transition-all active:scale-90 border border-[var(--border-subtle)]">
           <span className="material-symbols-outlined text-[20px] text-[#D4AF37]">add</span>
         </button>
       </div>
@@ -71,8 +71,8 @@ export default function LibraryPage() {
             onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-full text-[13px] font-medium transition-all duration-300 active:scale-95 border ${
               tab === t
-                ? 'bg-white text-black border-white'
-                : 'bg-transparent text-white border-white/20 hover:border-white/40'
+                ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-[var(--text-primary)]'
+                : 'bg-transparent text-[var(--text-primary)] border-[var(--border-medium)] hover:border-[var(--text-secondary)]'
             }`}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -83,7 +83,7 @@ export default function LibraryPage() {
       {/* Recents section */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-white">Recents</h2>
+          <h2 className="text-sm font-bold text-[var(--text-primary)]">Recents</h2>
           <button onClick={() => router.push('/search')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
             Show all
           </button>
@@ -97,10 +97,10 @@ export default function LibraryPage() {
                 <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-bold text-white truncate">Liked Songs</p>
+                <p className="text-[14px] font-bold text-[var(--text-primary)] truncate">Liked Songs</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="material-symbols-outlined text-[#1DB954] text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>arrow_circle_down</span>
-                  <p className="text-[12px] text-zinc-400">Playlist • {items.length} songs</p>
+                  <p className="text-[12px] text-[var(--text-secondary)]">Playlist • {items.length} songs</p>
                 </div>
               </div>
             </div>
@@ -123,8 +123,8 @@ export default function LibraryPage() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-medium text-white truncate">{track.title}</p>
-                  <p className="text-[12px] text-zinc-400 truncate mt-0.5">Single • {track.artist.name}</p>
+                  <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">{track.title}</p>
+                  <p className="text-[12px] text-[var(--text-secondary)] truncate mt-0.5">Single • {track.artist.name}</p>
                 </div>
               </div>
             ))}
@@ -147,8 +147,8 @@ export default function LibraryPage() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1" onClick={() => play(item.track, items.map(it => it.track))}>
-                  <p className="text-[14px] font-medium text-white truncate">{item.track.title}</p>
-                  <p className="text-[12px] text-zinc-400 truncate mt-0.5">Playlist • {item.track.artist.name}</p>
+                  <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">{item.track.title}</p>
+                  <p className="text-[12px] text-[var(--text-secondary)] truncate mt-0.5">Playlist • {item.track.artist.name}</p>
                 </div>
                 <button
                   onClick={() => removeItem(item.track.id)}
@@ -180,8 +180,8 @@ export default function LibraryPage() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-medium text-white truncate group-hover:text-[#D4AF37] transition-colors">{artist.name}</p>
-                  <p className="text-[12px] text-zinc-400 truncate mt-0.5">Artist</p>
+                  <p className="text-[14px] font-medium text-[var(--text-primary)] truncate group-hover:text-[#D4AF37] transition-colors">{artist.name}</p>
+                  <p className="text-[12px] text-[var(--text-secondary)] truncate mt-0.5">Artist</p>
                 </div>
               </a>
             ))}
@@ -191,17 +191,17 @@ export default function LibraryPage() {
 
       {/* Add actions */}
       <section className="space-y-2">
-        <button onClick={() => router.push('/search?q=artists')} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all active:scale-[0.99]">
-          <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl text-white">add</span>
+        <button onClick={() => router.push('/search?q=artists')} className="w-full flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] transition-all active:scale-[0.99]">
+          <div className="w-12 h-12 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center">
+            <span className="material-symbols-outlined text-xl text-[var(--text-primary)]">add</span>
           </div>
-          <span className="text-[14px] font-medium text-white">Add artists</span>
+          <span className="text-[14px] font-medium text-[var(--text-primary)]">Add artists</span>
         </button>
-        <button onClick={() => router.push('/search?q=podcasts')} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all active:scale-[0.99]">
-          <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-            <span className="material-symbols-outlined text-xl text-white">add</span>
+        <button onClick={() => router.push('/search?q=podcasts')} className="w-full flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)] transition-all active:scale-[0.99]">
+          <div className="w-12 h-12 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center">
+            <span className="material-symbols-outlined text-xl text-[var(--text-primary)]">add</span>
           </div>
-          <span className="text-[14px] font-medium text-white">Add podcasts</span>
+          <span className="text-[14px] font-medium text-[var(--text-primary)]">Add podcasts</span>
         </button>
       </section>
     </div>

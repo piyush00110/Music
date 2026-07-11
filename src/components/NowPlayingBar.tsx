@@ -20,7 +20,7 @@ export default function NowPlayingBar() {
     : currentTrack.album.cover_medium;
 
   return (
-    <div className="fixed bottom-[52px] md:bottom-0 left-0 right-0 z-40 px-2 md:px-0">
+    <div className="fixed bottom-[56px] md:bottom-0 left-0 right-0 z-40 px-2 md:px-0">
       <style jsx global>{`
         @keyframes npb-pulse {
           0%, 100% { opacity: 0.6; transform: scale(1); }

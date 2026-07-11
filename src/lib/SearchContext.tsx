@@ -14,6 +14,7 @@ interface SearchState {
   setResults: (r: Track[]) => void;
   setLoading: (l: boolean) => void;
   addToHistory: (q: string) => void;
+  removeFromHistory: (q: string) => void;
   clearHistory: () => void;
 }
 
@@ -49,13 +50,21 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const removeFromHistory = useCallback((q: string) => {
+    setSearchHistory(prev => {
+      const next = prev.filter(h => h !== q);
+      try { localStorage.setItem(LS_HISTORY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
   const clearHistory = useCallback(() => {
     setSearchHistory([]);
     try { localStorage.removeItem(LS_HISTORY); } catch {}
   }, []);
 
   return (
-    <SearchContext.Provider value={{ query, results, loading, searchHistory, setQuery, setResults, setLoading, addToHistory, clearHistory }}>
+    <SearchContext.Provider value={{ query, results, loading, searchHistory, setQuery, setResults, setLoading, addToHistory, removeFromHistory, clearHistory }}>
       {children}
     </SearchContext.Provider>
   );
