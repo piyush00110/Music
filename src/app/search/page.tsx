@@ -165,6 +165,27 @@ function SearchContent() {
 
   // Keyboard navigation in suggestions
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (showSuggestions && selectedSuggestion >= 0) {
+        const total = suggestions.length + suggestionTracks.length;
+        if (selectedSuggestion < suggestions.length) {
+          setQuery(suggestions[selectedSuggestion]);
+          doSearch(suggestions[selectedSuggestion]);
+        } else {
+          const track = suggestionTracks[selectedSuggestion - suggestions.length];
+          if (track) {
+            setQuery(`${track.artist} ${track.title}`);
+            doSearch(`${track.artist} ${track.title}`);
+          }
+        }
+        setSelectedSuggestion(-1);
+      } else if (query.trim()) {
+        doSearch(query);
+      }
+      setShowSuggestions(false);
+      return;
+    }
     if (!showSuggestions) return;
     const total = suggestions.length + suggestionTracks.length;
     if (e.key === 'ArrowDown') {
@@ -173,24 +194,11 @@ function SearchContent() {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedSuggestion(prev => (prev - 1 + total) % total);
-    } else if (e.key === 'Enter' && selectedSuggestion >= 0) {
-      e.preventDefault();
-      if (selectedSuggestion < suggestions.length) {
-        setQuery(suggestions[selectedSuggestion]);
-        doSearch(suggestions[selectedSuggestion]);
-      } else {
-        const track = suggestionTracks[selectedSuggestion - suggestions.length];
-        if (track) {
-          setQuery(`${track.artist} ${track.title}`);
-          doSearch(`${track.artist} ${track.title}`);
-        }
-      }
-      setSelectedSuggestion(-1);
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
       inputRef.current?.blur();
     }
-  }, [showSuggestions, suggestions, suggestionTracks, selectedSuggestion, doSearch]);
+  }, [showSuggestions, suggestions, suggestionTracks, selectedSuggestion, doSearch, query]);
 
   // Voice search
   const startVoiceSearch = useCallback(() => {

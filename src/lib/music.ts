@@ -53,7 +53,7 @@ export async function searchMusic(query: string): Promise<Track[]> {
 
   const url = `/api/search?q=${encodeURIComponent(query)}`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) return [];
     const data = await res.json();
     const seen = new Set<string>();

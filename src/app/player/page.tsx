@@ -412,10 +412,10 @@ export default function PlayerPage() {
         </div>
 
         {/* Track Info */}
-        <div className="flex items-end justify-between mt-5">
-          <div className="min-w-0 flex-1 pr-4">
-            <h1 className="font-headline-md text-white tracking-tight leading-tight text-2xl md:text-3xl truncate">{currentTrack.title}</h1>
-            <p className="uppercase tracking-[0.25em] text-[11px] mt-1.5 font-bold" style={{ color: `${dominantColor}99` }}>{currentTrack.artist.name}</p>
+        <div className="flex items-end justify-between mt-5 gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-headline-md text-white tracking-tight leading-tight text-xl md:text-3xl truncate">{currentTrack.title}</h1>
+            <p className="uppercase tracking-[0.15em] text-[11px] mt-1.5 font-bold truncate" style={{ color: `${dominantColor}99` }}>{currentTrack.artist.name}</p>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mt-2"
               style={{ backgroundColor: `${dominantColor}12`, border: `1px solid ${dominantColor}30` }}>
               <span className="material-symbols-outlined text-[12px]" style={{ color: dominantColor, fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
@@ -443,8 +443,9 @@ export default function PlayerPage() {
               </div>
             )}
           </div>
-          <div className="flex justify-between mt-2.5 text-[10px] text-zinc-500 tracking-[0.15em] font-medium tabular-nums">
-            <span>{formatTime(progress)}</span><span>{formatTime(duration)}</span>
+          <div className="flex justify-between mt-2.5 text-[11px] text-zinc-500 font-medium tabular-nums">
+            <span className="w-12 text-left">{formatTime(progress)}</span>
+            <span className="w-12 text-right">{formatTime(duration)}</span>
           </div>
         </div>
 

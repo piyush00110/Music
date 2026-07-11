@@ -156,27 +156,21 @@ export async function GET(request: Request) {
     });
   }
 
-  // YouTube InnerTube + HTML scrape in parallel for speed
-  let yt = await searchYT(query).catch(() => null);
-  let ytHtml: any[] | null = null;
-  if (!yt?.length) {
-    [yt, ytHtml] = await Promise.all([
-      searchYT(query).catch(() => null),
-      searchHTML(query).catch(() => null),
-    ]);
-    yt = yt || ytHtml;
-  }
-  // If few results, try with "official audio" suffix (only if needed)
+  // Run ALL sources in parallel for maximum speed
+  const [ytResults, ytHtmlResults, au, dz] = await Promise.all([
+    searchYT(query).catch(() => null),
+    searchHTML(query).catch(() => null),
+    searchAudius(query).catch(() => [] as any[]),
+    searchDeezer(query).catch(() => [] as any[]),
+  ]);
+
+  let yt = ytResults || ytHtmlResults;
+
+  // If few YouTube results, try with "official audio" suffix
   if (!yt || yt.length < 3) {
     const yt2 = await searchYT(`${query} official audio`).catch(() => null);
     if (yt2?.length) yt = [...(yt || []), ...yt2];
   }
-
-  // Audius + Deezer (parallel)
-  const [au, dz] = await Promise.all([
-    searchAudius(query).catch(() => [] as any[]),
-    searchDeezer(query).catch(() => [] as any[]),
-  ]);
 
   return NextResponse.json({
     items: [

@@ -567,6 +567,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audioRef.current = au;
     initAudioContext(au);
 
+    // Sync duration immediately when audio metadata loads (fixes 0:00 instantly)
+    au.addEventListener('loadedmetadata', () => {
+      if (au.duration && isFinite(au.duration) && au.duration > 0) {
+        setState(s => ({ ...s, duration: au.duration }));
+      }
+    });
+    au.addEventListener('durationchange', () => {
+      if (au.duration && isFinite(au.duration) && au.duration > 0) {
+        const s = sRef.current;
+        if (Math.abs(au.duration - s.duration) > 1) {
+          setState(prev => ({ ...prev, duration: au.duration }));
+        }
+      }
+    });
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') ensureAudioContext();
     };
@@ -670,14 +685,29 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const s = sRef.current;
       if (!s.isPlaying || !s.currentTrack) return;
       let currentTime = 0;
+      let dur = s.duration;
       if (streamingRef.current || useAudioSource(s.currentTrack)) {
-        currentTime = audioRef.current?.currentTime || 0;
+        const au = audioRef.current;
+        if (au) {
+          currentTime = au.currentTime || 0;
+          // Sync duration from audio element (never done before — root cause of 0:00)
+          if (au.duration && isFinite(au.duration) && au.duration > 0) {
+            dur = au.duration;
+          }
+        }
       } else {
-        try { currentTime = ytPlayerRef.current?.getCurrentTime?.() || 0; } catch {}
+        try {
+          currentTime = ytPlayerRef.current?.getCurrentTime?.() || 0;
+          const ytDur = ytPlayerRef.current?.getDuration?.();
+          if (ytDur && ytDur > 0) dur = ytDur;
+        } catch {}
       }
-      // Only update state if progress changed by more than 0.3s (avoid constant re-renders)
-      if (Math.abs(currentTime - s.progress) > 0.3) {
-        setState(prev => ({ ...prev, progress: currentTime }));
+      // Update progress (only if changed significantly)
+      // Always update duration if it changed (fixes 0:00 bug)
+      const progressChanged = Math.abs(currentTime - s.progress) > 0.3;
+      const durationChanged = Math.abs(dur - s.duration) > 1;
+      if (progressChanged || durationChanged) {
+        setState(prev => ({ ...prev, progress: currentTime, duration: dur }));
       }
     }, 500);
     return () => clearInterval(iv);
@@ -835,7 +865,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const rp = s.recentlyPlayed.filter(t => t.id !== track.id);
       rp.unshift(track);
       if (rp.length > 50) rp.length = 50;
-      return { ...s, currentTrack: track, isPlaying: true, queue, queueIndex: idx >= 0 ? idx : 0, progress: 0, recentlyPlayed: rp };
+      return { ...s, currentTrack: track, isPlaying: true, queue, queueIndex: idx >= 0 ? idx : 0, progress: 0, duration: 0, recentlyPlayed: rp };
     });
     updateMediaSession(track);
     applyEQ();
