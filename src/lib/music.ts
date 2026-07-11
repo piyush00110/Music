@@ -34,13 +34,23 @@ function trackFromItem(v: any, i: number): Track {
     return base;
   }
 
+  if (v.source === 'itunes') {
+    const cover = v.cover || '';
+    base.album.title = v.title || '';
+    base.album.cover = cover;
+    base.album.cover_small = cover;
+    base.album.cover_medium = cover;
+    base.preview = v.preview || '';
+    return base;
+  }
+
   if (v.source === 'deezer') {
     const cover = v.cover || '';
     base.album.title = '';
     base.album.cover = cover;
     base.album.cover_small = cover;
     base.album.cover_medium = cover;
-    base.preview = v.stream || '';
+    base.preview = v.preview || v.stream || '';
     return base;
   }
 
@@ -52,28 +62,20 @@ export async function searchMusic(query: string): Promise<Track[]> {
   if (!query.trim()) return [];
 
   const url = `/api/search?q=${encodeURIComponent(query)}`;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const seen = new Set<string>();
-    const all: Track[] = [];
-    for (const v of (data.items || [])) {
-      const track = trackFromItem(v, all.length + 1);
-      // Better dedup: normalize title and artist for comparison
-      const normalTitle = track.title.toLowerCase().replace(/[\s\-_.,!?'"()[\]{}:;/\\|@#$%^&*+=~`]/g, '').replace(/official.*|video.*|audio.*|lyric.*|hd.*|4k.*/gi, '');
-      const normalArtist = track.artist.name.toLowerCase().replace(/[\s\-_.,!?'"()[\]{}:;/\\|@#$%^&*+=~`]/g, '');
-      const key = `${normalTitle}|||${normalArtist}`;
-      if (seen.has(key)) continue;
-      // Also skip if title is very different length (likely wrong match)
-      if (normalTitle.length < 3) continue;
-      seen.add(key);
-      all.push(track);
-    }
-    return all;
-  } catch {
-    return [];
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`Search failed (${res.status})`);
+  const data = await res.json();
+  const seen = new Set<string>();
+  const all: Track[] = [];
+  for (const v of (data.items || [])) {
+    const track = trackFromItem(v, all.length + 1);
+    // Simple dedup by youtubeId
+    if (track.youtubeId && seen.has(track.youtubeId)) continue;
+    if (track.youtubeId) seen.add(track.youtubeId);
+    if (!track.title.trim()) continue;
+    all.push(track);
   }
+  return all;
 }
 
 // ─── Trending ───────────────────────────────────────────────────
