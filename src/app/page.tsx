@@ -159,13 +159,16 @@ export default function HomePage() {
               onClick={e => { e.preventDefault(); window.location.href = `/search?q=${encodeURIComponent(artist.name)}`; }}
               className="flex-shrink-0 flex flex-col items-center gap-2.5 group cursor-pointer"
             >
-              <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden artist-circle shadow-lg shadow-black/30">
+              <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden artist-circle shadow-lg shadow-black/30 bg-zinc-800">
                 <img
                   src={artist.image}
                   alt={artist.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" fill="%23333"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="32" font-family="sans-serif">${artist.name.charAt(0)}</text></svg>`)}`;
+                    const img = e.target as HTMLImageElement;
+                    if (img.dataset.fallback) return;
+                    img.dataset.fallback = '1';
+                    img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" fill="#333"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="#D4AF37" font-size="32" font-weight="bold" font-family="sans-serif">${artist.name.charAt(0)}</text></svg>`)}`;
                   }}
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center">

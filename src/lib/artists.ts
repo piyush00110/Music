@@ -20,7 +20,7 @@ export const TOP_ARTISTS: Artist[] = [
   {
     id: 1,
     name: 'Arijit Singh',
-    image: 'https://i.scdn.co/image/ab6761610000e5ebe6a440c76e75f462c5f89dca',
+    image: 'https://i.pravatar.cc/300?img=11',
     genre: 'Bollywood',
     followers: '48.2M',
     popularSongs: ['Tum Hi Ho', 'Channa Mereya', 'Agar Tum Saath Ho'],
@@ -28,7 +28,7 @@ export const TOP_ARTISTS: Artist[] = [
   {
     id: 2,
     name: 'Atif Aslam',
-    image: 'https://i.scdn.co/image/ab6761610000e5eb8b3d7b0b4c57e4b3e5c5b5a5',
+    image: 'https://i.pravatar.cc/300?img=12',
     genre: 'Pop',
     followers: '32.1M',
     popularSongs: ['Dil Diyan Gallan', 'Tajdar-e-Haram', 'Woh Lamhe'],
@@ -36,7 +36,7 @@ export const TOP_ARTISTS: Artist[] = [
   {
     id: 3,
     name: 'Badshah',
-    image: 'https://i.scdn.co/image/ab6761610000e5eba4b87d5b1b5b1b5b1b5b1b5b',
+    image: 'https://i.pravatar.cc/300?img=14',
     genre: 'Hip-Hop',
     followers: '28.5M',
     popularSongs: ['Garmi', 'Saturday Saturday', 'Abhi Toh Party Shuru Hui Hai'],
@@ -44,7 +44,7 @@ export const TOP_ARTISTS: Artist[] = [
   {
     id: 4,
     name: 'Pritam',
-    image: 'https://i.scdn.co/image/ab6761610000e5eb15f4c6a2e3f2e3f2e3f2e3f2',
+    image: 'https://i.pravatar.cc/300?img=15',
     genre: 'Bollywood',
     followers: '25.8M',
     popularSongs: ['Tum Mile', 'Channa Mereya', 'Gerua'],
@@ -52,7 +52,7 @@ export const TOP_ARTISTS: Artist[] = [
   {
     id: 5,
     name: 'Millind Gaba',
-    image: 'https://i.scdn.co/image/ab6761610000e5ebd9f3e3e3e3e3e3e3e3e3e3e3',
+    image: 'https://i.pravatar.cc/300?img=17',
     genre: 'Pop',
     followers: '18.3M',
     popularSongs: ['Main Shair Badnaam', 'Nazar Na Lag Ja', 'Yaar Mod Do'],
@@ -60,7 +60,7 @@ export const TOP_ARTISTS: Artist[] = [
   {
     id: 6,
     name: 'AP Dhillon',
-    image: 'https://i.scdn.co/image/ab6761610000e5ebf5f5f5f5f5f5f5f5f5f5f5f5',
+    image: 'https://i.pravatar.cc/300?img=18',
     genre: 'Punjabi',
     followers: '22.1M',
     popularSongs: ['Brown Munde', 'Excuses', 'Insane'],
@@ -68,7 +68,7 @@ export const TOP_ARTISTS: Artist[] = [
   {
     id: 7,
     name: 'Arijit Singh',
-    image: 'https://i.scdn.co/image/ab6761610000e5ebe6a440c76e75f462c5f89dca',
+    image: 'https://i.pravatar.cc/300?img=33',
     genre: 'Bollywood',
     followers: '48.2M',
     popularSongs: ['Tum Hi Ho', 'Channa Mereya', 'Agar Tum Saath Ho'],
@@ -76,7 +76,7 @@ export const TOP_ARTISTS: Artist[] = [
   {
     id: 8,
     name: 'Shreya Ghoshal',
-    image: 'https://i.scdn.co/image/ab6761610000e5ebc4e0e3e3e3e3e3e3e3e3e3e3',
+    image: 'https://i.pravatar.cc/300?img=23',
     genre: 'Bollywood',
     followers: '35.6M',
     popularSongs: ['Sun Raha Hai', 'Manwa Laage', 'Deewani Mastani'],
@@ -135,12 +135,12 @@ export const FEATURED_PLAYLISTS: Playlist[] = [
 ];
 
 export const NEW_RELEASES = [
-  { id: 1, title: 'Mann Mera', artist: 'Gajendra Verma', type: 'Single', cover: 'https://i.scdn.co/image/ab67616d0000b273ce6c3e4e3b0b1b5b1b5b1b5b' },
-  { id: 2, title: 'Ishqa Ve', artist: 'Zeeshan Ali', type: 'Single', cover: 'https://i.scdn.co/image/ab67616d0000b273ce6c3e4e3b0b1b5b1b5b1b5b' },
-  { id: 3, title: 'Majboor', artist: 'Sheheryar Rehan', type: 'Single', cover: 'https://i.scdn.co/image/ab67616d0000b273ce6c3e4e3b0b1b5b1b5b1b5b' },
-  { id: 4, title: 'Dhurandhar', artist: 'Echo', type: 'Playlist', cover: 'https://i.scdn.co/image/ab67616d0000b273ce6c3e4e3b0b1b5b1b5b1b5b' },
-  { id: 5, title: 'Deewaniyat', artist: 'Various Artists', type: 'Album', cover: 'https://i.scdn.co/image/ab67616d0000b273ce6c3e4e3b0b1b5b1b5b1b5b' },
-  { id: 6, title: 'Tum Mile', artist: 'Pritam', type: 'Album', cover: 'https://i.scdn.co/image/ab67616d0000b273ce6c3e4e3b0b1b5b1b5b1b5b' },
+  { id: 1, title: 'Mann Mera', artist: 'Gajendra Verma', type: 'Single', cover: '' },
+  { id: 2, title: 'Ishqa Ve', artist: 'Zeeshan Ali', type: 'Single', cover: '' },
+  { id: 3, title: 'Majboor', artist: 'Sheheryar Rehan', type: 'Single', cover: '' },
+  { id: 4, title: 'Dhurandhar', artist: 'Echo', type: 'Playlist', cover: '' },
+  { id: 5, title: 'Deewaniyat', artist: 'Various Artists', type: 'Album', cover: '' },
+  { id: 6, title: 'Tum Mile', artist: 'Pritam', type: 'Album', cover: '' },
 ];
 
 export const MOOD_PLAYLISTS = [
