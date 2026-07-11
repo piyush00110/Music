@@ -5,7 +5,7 @@ import ProgressBar from './ProgressBar';
 import Link from 'next/link';
 
 export default function NowPlayingBar() {
-  const { currentTrack, isPlaying, pause, resume, next, prev, progress, duration, audioError } = usePlayer();
+  const { currentTrack, isPlaying, pause, resume, next, prev, seek, progress, duration, audioError } = usePlayer();
 
   if (!currentTrack) return null;
 
@@ -148,12 +148,6 @@ export default function NowPlayingBar() {
                 className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 text-zinc-300 hover:text-white transition-colors">
                 <span className="material-symbols-outlined text-[18px]">skip_previous</span>
               </button>
-              <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); isPlaying ? pause() : resume(); }}
-                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-all text-white hover:bg-white/10">
-                <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {isPlaying ? 'pause' : 'play_arrow'}
-                </span>
-              </button>
               <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); next(); }}
                 className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 text-zinc-300 hover:text-white transition-colors">
                 <span className="material-symbols-outlined text-[18px]">skip_next</span>
@@ -169,7 +163,7 @@ export default function NowPlayingBar() {
           <div className="px-3.5 pb-2.5">
             <div className="flex items-center gap-2">
               <span className="text-[9px] text-zinc-500 tabular-nums w-6">{formatTime(progress)}</span>
-              <div className="flex-1"><ProgressBar value={progress} max={duration} /></div>
+              <div className="flex-1"><ProgressBar value={progress} max={duration} onChange={(v) => seek(v)} /></div>
               <span className="text-[9px] text-zinc-500 tabular-nums w-6 text-right">{formatTime(duration)}</span>
             </div>
           </div>
@@ -182,7 +176,7 @@ export default function NowPlayingBar() {
           borderTop: isPlaying ? '1px solid rgba(212,175,55,0.15)' : undefined,
         }}
         onClick={(e) => {
-          if ((e.target as HTMLElement).closest('button')) {
+          if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[data-seekable]')) {
             e.preventDefault();
           }
         }}>
@@ -243,9 +237,9 @@ export default function NowPlayingBar() {
           </button>
         </div>
 
-        <div className="flex items-center gap-3 flex-1 max-w-md">
+        <div className="flex items-center gap-3 flex-1 max-w-md" data-seekable>
           <span className="text-[11px] text-zinc-500 w-8 text-right tabular-nums">{formatTime(progress)}</span>
-          <div className="flex-1"><ProgressBar value={progress} max={duration} /></div>
+          <div className="flex-1"><ProgressBar value={progress} max={duration} onChange={(v) => seek(v)} /></div>
           <span className="text-[11px] text-zinc-500 w-8 tabular-nums">{formatTime(duration)}</span>
         </div>
 

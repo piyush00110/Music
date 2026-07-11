@@ -173,45 +173,47 @@ export default function GalleryPage() {
       )}
 
       {/* Grid view */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-[family-name:var(--font-serif)] text-white">
-            {filter === 'wide' ? 'All Covers' : 'Album Art'}
-          </h2>
-          <span className="text-[10px] text-zinc-600">{images.length} images</span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 fade-in">
-          {images.map((img, i) => (
-            <div
-              key={`${img.track.id}-${i}`}
-              onClick={() => setSelectedImg(img)}
-              className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-white/[0.04] hover:border-[#D4AF37]/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] album-hover"
-            >
-              {img.src ? (
-                <img src={img.src} alt="" className="w-full h-full object-cover" loading="lazy" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-zinc-800/50">
-                  <span className="material-symbols-outlined text-3xl text-zinc-600">music_note</span>
+      {images.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg md:text-xl font-[family-name:var(--font-serif)] text-white">
+              {filter === 'wide' ? 'All Covers' : 'Album Art'}
+            </h2>
+            <span className="text-[10px] text-zinc-600">{images.length} images</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 fade-in">
+            {images.map((img, i) => (
+              <div
+                key={`${img.track.id}-${i}`}
+                onClick={() => setSelectedImg(img)}
+                className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-white/[0.04] hover:border-[#D4AF37]/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] album-hover"
+              >
+                {img.src ? (
+                  <img src={img.src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-zinc-800/50">
+                    <span className="material-symbols-outlined text-3xl text-zinc-600">music_note</span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                  <p className="text-[11px] md:text-xs font-medium text-white truncate">{img.title}</p>
+                  <p className="text-[10px] text-zinc-400 truncate">{img.artist}</p>
                 </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-2.5">
-                <p className="text-[11px] md:text-xs font-medium text-white truncate">{img.title}</p>
-                <p className="text-[10px] text-zinc-400 truncate">{img.artist}</p>
-              </div>
-              {/* Play overlay */}
-              <div className="play-overlay absolute inset-0 flex items-center justify-center">
-                <div
-                  onClick={(e) => { e.stopPropagation(); play(img.track, images.map(i => i.track)); }}
-                  className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-lg shadow-[#D4AF37]/40 active:scale-90 transition-all"
-                >
-                  <span className="material-symbols-outlined text-black text-xl">play_arrow</span>
+                {/* Play overlay - always visible on mobile */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+                  <div
+                    onClick={(e) => { e.stopPropagation(); play(img.track, images.map(i => i.track)); }}
+                    className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-lg shadow-[#D4AF37]/40 active:scale-90 transition-all md:hidden"
+                  >
+                    <span className="material-symbols-outlined text-black text-xl">play_arrow</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Empty state */}
       {!loading && images.length === 0 && (
@@ -225,7 +227,7 @@ export default function GalleryPage() {
       {/* Lightbox */}
       {selectedImg && (
         <div
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 fade-in"
+          className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 fade-in"
           onClick={() => setSelectedImg(null)}
         >
           <button

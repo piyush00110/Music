@@ -32,7 +32,7 @@ export default function LibraryPage() {
   const removeItem = (trackId: number) => {
     const updated = items.filter(i => i.track.id !== trackId);
     setItems(updated);
-    localStorage.setItem(LS_LIBRARY, JSON.stringify(updated));
+    try { localStorage.setItem(LS_LIBRARY, JSON.stringify(updated)); } catch {}
   };
 
   if (loading) {
@@ -130,8 +130,8 @@ export default function LibraryPage() {
             ))}
 
             {/* Library items */}
-            {items.map((item, i) => (
-              <div key={item.track.id} className="group relative flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer">
+            {items.map((item) => (
+              <div key={item.track.id} onClick={() => play(item.track, items.map(it => it.track))} className="group relative flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer">
                 <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
                   {item.track.album.cover_medium || item.track.youtubeId ? (
                     <img
@@ -146,12 +146,12 @@ export default function LibraryPage() {
                     </div>
                   )}
                 </div>
-                <div className="min-w-0 flex-1" onClick={() => play(item.track, items.map(it => it.track))}>
+                <div className="min-w-0 flex-1">
                   <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">{item.track.title}</p>
                   <p className="text-[12px] text-[var(--text-secondary)] truncate mt-0.5">Playlist • {item.track.artist.name}</p>
                 </div>
                 <button
-                  onClick={() => removeItem(item.track.id)}
+                  onClick={(e) => { e.stopPropagation(); removeItem(item.track.id); }}
                   className="w-8 h-8 rounded-full bg-white/5 hover:bg-red-500/20 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 z-10"
                 >
                   <span className="material-symbols-outlined text-[14px] text-red-400">close</span>

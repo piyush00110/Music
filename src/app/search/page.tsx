@@ -56,7 +56,7 @@ function SearchContent() {
   const restored = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Check voice search support
   useEffect(() => {
@@ -217,6 +217,7 @@ function SearchContent() {
   // Filtered results
   const filteredResults = useMemo(() => {
     if (activeFilter === 'all') return results;
+    if (activeFilter === 'songs') return results.filter(t => t.preview || t.youtubeId);
     if (activeFilter === 'artists') {
       const seen = new Set<string>();
       return results.filter(t => {
@@ -308,7 +309,7 @@ function SearchContent() {
         {showSuggestions && query.length >= 2 && (
           <div
             ref={suggestionsRef}
-            className="absolute top-full left-0 right-0 mt-2 bg-zinc-900/98 backdrop-blur-xl rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden z-[60] max-h-[70vh] overflow-y-auto"
+            className="absolute top-full left-0 right-0 mt-2 bg-zinc-900/98 backdrop-blur-xl rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden z-40 max-h-[70vh] overflow-y-auto"
           >
             {/* Suggestion tracks from Deezer */}
             {suggestionTracks.length > 0 && (

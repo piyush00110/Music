@@ -59,7 +59,7 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
     >
       {showIndex && (
         <span className={`w-5 text-center text-xs font-mono flex-shrink-0 ${isCurrentTrack ? 'text-[#D4AF37]' : 'text-zinc-600'}`}>
-          {index! + 1}
+          {(index ?? 0) + 1}
         </span>
       )}
 

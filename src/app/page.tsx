@@ -10,17 +10,17 @@ import { TOP_ARTISTS, FEATURED_PLAYLISTS, MOOD_PLAYLISTS } from '@/lib/artists';
 
 const GENRE_COLORS: Record<string, string> = {
   'Pop': 'from-pink-500/30 to-rose-600/30',
-  'Hip Hop': 'from-amber-500/30 to-orange-600/30',
+  'Hip-Hop': 'from-amber-500/30 to-orange-600/30',
   'Rock': 'from-red-500/30 to-red-700/30',
   'Electronic': 'from-cyan-500/30 to-blue-600/30',
   'R&B': 'from-purple-500/30 to-violet-600/30',
   'Classical': 'from-emerald-500/30 to-teal-600/30',
   'Jazz': 'from-yellow-500/30 to-amber-600/30',
-  'LoFi': 'from-indigo-500/30 to-blue-600/30',
   'Country': 'from-orange-500/30 to-red-600/30',
-  'Latin': 'from-green-500/30 to-emerald-600/30',
-  'Punjabi': 'from-orange-500/30 to-yellow-500/30',
-  'Bollywood': 'from-rose-500/30 to-pink-600/30',
+  'Metal': 'from-gray-500/30 to-zinc-600/30',
+  'Folk': 'from-amber-500/30 to-yellow-600/30',
+  'Ambient': 'from-blue-500/30 to-indigo-600/30',
+  'Reggae': 'from-green-500/30 to-lime-600/30',
 };
 
 // Genre images removed — using gradient cards instead (no broken external URLs)

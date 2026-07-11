@@ -489,7 +489,7 @@ export default function PlayerPage() {
                 </span>
               </button>
             ) : (
-              <button onClick={() => startSleepTimer(sleepTimer === null ? 30 : sleepTimer)}
+              <button onClick={() => startSleepTimer(30)}
                 className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-all duration-300 active:scale-90 text-zinc-400 hover:text-white group relative">
                 <span className="material-symbols-outlined text-[22px] group-hover:text-[#D4AF37] transition-colors">bedtime</span>
               </button>
@@ -518,10 +518,10 @@ export default function PlayerPage() {
       </main>
 
       {/* Drawer backdrop */}
-      <div className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-500 ${drawerOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setDrawerOpen(false)} />
+      <div className={`fixed inset-0 z-[50] bg-black/60 backdrop-blur-sm transition-opacity duration-500 ${drawerOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setDrawerOpen(false)} />
 
       {/* Audio Excellence Drawer */}
-      <div className={`fixed bottom-0 left-0 w-full z-50 transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+      <div className={`fixed bottom-0 left-0 w-full z-[55] transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="glass-panel rounded-t-[32px] md:rounded-t-[40px] px-6 md:px-8 pt-4 pb-10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] max-h-[85vh] overflow-y-auto">
           <div className="flex flex-col items-center cursor-pointer mb-6" onClick={() => setDrawerOpen(false)}>
             <div className="w-10 h-1 bg-white/10 rounded-full" />
