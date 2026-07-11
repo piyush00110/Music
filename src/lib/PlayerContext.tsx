@@ -603,7 +603,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
 
     // No YouTube ID — search YouTube
-    setAudioError('Loading...');
+    setAudioError(null);
     try {
       const found = await findOnYouTube(track.title, track.artist.name);
       if (found) {
