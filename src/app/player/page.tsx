@@ -148,6 +148,38 @@ export default function PlayerPage() {
   const [activeEqPreset, setActiveEqPreset] = useState(equalizer.preset || 'Flat');
   const progressRef = useRef<HTMLDivElement>(null);
 
+  // Sleep timer
+  const [sleepTimer, setSleepTimer] = useState<number | null>(null);
+  const [sleepTimerRemaining, setSleepTimerRemaining] = useState(0);
+  const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startSleepTimer = useCallback((minutes: number) => {
+    if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+    const endTime = Date.now() + minutes * 60 * 1000;
+    setSleepTimer(minutes);
+    setSleepTimerRemaining(minutes * 60);
+    sleepTimerRef.current = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      setSleepTimerRemaining(remaining);
+      if (remaining <= 0) {
+        clearInterval(sleepTimerRef.current!);
+        pause();
+        setSleepTimer(null);
+        setSleepTimerRemaining(0);
+      }
+    }, 1000);
+  }, [pause]);
+
+  const cancelSleepTimer = useCallback(() => {
+    if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+    setSleepTimer(null);
+    setSleepTimerRemaining(0);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (sleepTimerRef.current) clearInterval(sleepTimerRef.current); };
+  }, []);
+
   const pct = duration > 0 ? (progress / duration) * 100 : 0;
   const displayPct = seeking ? localPct : pct;
 
@@ -280,7 +312,14 @@ export default function PlayerPage() {
         <Link href="/" className="w-10 h-10 rounded-full bg-white/5 backdrop-blur-xl border border-white/[0.06] flex items-center justify-center active:scale-90 transition-all hover:bg-white/10">
           <span className="material-symbols-outlined text-[22px] text-zinc-300">expand_more</span>
         </Link>
-        <div className="text-[10px] tracking-[0.5em] text-zinc-400 uppercase font-medium">Now Playing</div>
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-end gap-[2px] h-3">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="w-[2px] rounded-full bg-[#D4AF37] eq-bar" style={{ height: isPlaying ? undefined : '4px', animationPlayState: isPlaying ? 'running' : 'paused' }} />
+            ))}
+          </div>
+          <div className="text-[10px] tracking-[0.5em] text-zinc-400 uppercase font-medium">Now Playing</div>
+        </div>
         <button onClick={() => setShowMenu(!showMenu)} className="w-10 h-10 rounded-full bg-white/5 backdrop-blur-xl border border-white/[0.06] flex items-center justify-center active:scale-90 transition-all hover:bg-white/10">
           <span className="material-symbols-outlined text-[22px] text-zinc-300">more_vert</span>
         </button>
@@ -440,6 +479,21 @@ export default function PlayerPage() {
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Audio Experience</span>
           </button>
           <div className="flex items-center gap-2">
+            {/* Sleep Timer */}
+            {sleepTimer ? (
+              <button onClick={cancelSleepTimer} className="flex items-center gap-1.5 px-3 py-2 rounded-full transition-all duration-300 active:scale-90"
+                style={{ backgroundColor: `${dominantColor}15`, border: `1px solid ${dominantColor}30` }}>
+                <span className="material-symbols-outlined text-[16px] animate-pulse" style={{ color: dominantColor, fontVariationSettings: "'FILL' 1" }}>bedtime</span>
+                <span className="text-[10px] font-mono font-bold" style={{ color: dominantColor }}>
+                  {Math.floor(sleepTimerRemaining / 60)}:{(sleepTimerRemaining % 60).toString().padStart(2, '0')}
+                </span>
+              </button>
+            ) : (
+              <button onClick={() => startSleepTimer(sleepTimer === null ? 30 : sleepTimer)}
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-all duration-300 active:scale-90 text-zinc-400 hover:text-white group relative">
+                <span className="material-symbols-outlined text-[22px] group-hover:text-[#D4AF37] transition-colors">bedtime</span>
+              </button>
+            )}
             <button onClick={() => setShowQueue(true)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-all duration-300 active:scale-90 text-zinc-400 hover:text-white">
               <span className="material-symbols-outlined text-[22px]">queue_music</span>
             </button>
@@ -448,6 +502,19 @@ export default function PlayerPage() {
             </button>
           </div>
         </div>
+
+        {/* Sleep Timer Picker */}
+        {sleepTimer === null && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <span className="text-[9px] text-zinc-600 uppercase tracking-[0.2em]">Sleep in:</span>
+            {[15, 30, 45, 60, 90].map(m => (
+              <button key={m} onClick={() => startSleepTimer(m)}
+                className="px-2.5 py-1 rounded-full text-[9px] font-bold border border-white/10 text-zinc-500 hover:border-white/20 hover:text-white transition-all active:scale-95">
+                {m}m
+              </button>
+            ))}
+          </div>
+        )}
       </main>
 
       {/* Drawer backdrop */}

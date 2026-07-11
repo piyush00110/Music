@@ -65,16 +65,16 @@ export default function HomePage() {
   const popularGenres = GENRES.slice(0, 12);
 
   return (
-    <div className="px-4 md:px-8 lg:px-12 py-5 max-w-screen-xl mx-auto">
+    <div className="px-4 md:px-8 lg:px-12 py-5 max-w-screen-xl mx-auto page-transition">
       {/* Hero - Spotify-style greeting */}
-      <section className="relative mb-8 md:mb-10">
+      <section className="relative mb-8 md:mb-10 slide-up">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#FFBF00] flex items-center justify-center shadow-lg shadow-[#D4AF37]/20">
             <span className="material-symbols-outlined text-black text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Good Evening</h1>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-[0.15em]">What do you want to listen to?</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">Good Evening</h1>
+            <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-[0.15em]">What do you want to listen to?</p>
           </div>
         </div>
 
@@ -84,7 +84,7 @@ export default function HomePage() {
             <button
               key={`quick-${track.id}`}
               onClick={() => play(track, tracks)}
-              className="flex items-center gap-3 bg-white/[0.06] hover:bg-white/[0.1] rounded-lg overflow-hidden transition-all duration-300 active:scale-[0.98] group text-left"
+                className="flex items-center gap-3 bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] rounded-lg overflow-hidden transition-all duration-300 active:scale-[0.98] group text-left"
             >
               <div className="w-12 h-12 flex-shrink-0 relative overflow-hidden">
                 {(track.album.cover_medium || track.youtubeId) ? (
@@ -115,7 +115,7 @@ export default function HomePage() {
                 )}
               </div>
               <div className="min-w-0 flex-1 pr-2">
-                <p className="text-[12px] font-semibold text-white truncate">{track.title}</p>
+                <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">{track.title}</p>
               </div>
             </button>
           ))}
@@ -125,7 +125,7 @@ export default function HomePage() {
       {/* Mood Playlists */}
       <section className="mb-8 md:mb-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-bold text-white">Browse by Mood</h2>
+          <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Browse by Mood</h2>
         </div>
         <div className="flex gap-2.5 overflow-x-auto pb-3 -mx-4 px-4 hide-scrollbar scroll-smooth-x">
           {MOOD_PLAYLISTS.map((mood, i) => (
@@ -148,7 +148,7 @@ export default function HomePage() {
       {/* Top Artists - Circular */}
       <section className="mb-8 md:mb-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-bold text-white">Popular Artists</h2>
+          <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Popular Artists</h2>
           <button onClick={() => router.push('/search?q=artists')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
             Show all
           </button>
@@ -191,7 +191,7 @@ export default function HomePage() {
       {/* Featured Playlists - Horizontal scroll cards */}
       <section className="mb-8 md:mb-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-bold text-white">Made for You</h2>
+          <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Made for You</h2>
           <button onClick={() => router.push('/search?q=playlists')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
             Show all
           </button>
@@ -213,7 +213,7 @@ export default function HomePage() {
                 </button>
               </div>
               <div className="p-3">
-                <p className="text-[13px] font-bold text-white truncate">{playlist.title}</p>
+                <p className="text-[13px] font-bold text-[var(--text-primary)] truncate">{playlist.title}</p>
                 <p className="text-[11px] text-zinc-400 truncate mt-1">{playlist.description}</p>
               </div>
             </div>
@@ -225,7 +225,7 @@ export default function HomePage() {
       {popularGenres.length > 0 && (
         <section className="mb-8 md:mb-10">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg md:text-xl font-bold text-white">Explore Genres</h2>
+            <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Explore Genres</h2>
           </div>
           <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 stagger-children">
             {popularGenres.map(genre => (
@@ -248,7 +248,7 @@ export default function HomePage() {
       {/* Recently Played / Recents */}
       <section className="mb-8 md:mb-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-bold text-white">Recents</h2>
+          <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Recents</h2>
           <button onClick={() => router.push('/library')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
             Show all
           </button>
@@ -293,8 +293,8 @@ export default function HomePage() {
                 </button>
               </div>
               <div className="p-3">
-                <p className="text-[13px] font-bold text-white truncate">{track.title}</p>
-                <p className="text-[11px] text-zinc-400 truncate mt-1">{track.artist.name}</p>
+                <p className="text-[13px] font-bold text-[var(--text-primary)] truncate">{track.title}</p>
+                <p className="text-[11px] text-[var(--text-secondary)] truncate mt-1">{track.artist.name}</p>
               </div>
             </div>
           ))}
@@ -305,7 +305,7 @@ export default function HomePage() {
       <section className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg md:text-xl font-bold text-white">Trending Now</h2>
+            <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Trending Now</h2>
             <p className="text-[10px] text-zinc-500 mt-0.5 uppercase tracking-[0.15em]">From YouTube & Audius</p>
           </div>
           <span className="text-[10px] text-zinc-600">{tracks.length} tracks</span>
