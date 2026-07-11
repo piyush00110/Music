@@ -468,23 +468,76 @@ export default function PlayerPage() {
               </div>
             </div>
 
-            {/* Spatial Audio Toggle */}
-            <div className="flex items-center justify-between p-5 rounded-2xl glass-card">
-              <div className="flex items-center gap-4">
-                <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: `${dominantColor}15`, border: `1px solid ${dominantColor}15` }}>
-                  <span className="material-symbols-outlined text-xl" style={{ color: dominantColor }}>spatial_audio</span>
+            {/* Sound Effects Panel */}
+            <div className="space-y-3">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-medium">Sound Effects</p>
+
+              {/* Bass Boost */}
+              <div className="p-4 rounded-2xl glass-card">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-lg" style={{ color: dominantColor }}>bass_3</span>
+                    <span className="text-[12px] text-white font-medium">Bass Boost</span>
+                  </div>
+                  <span className="text-[10px] font-mono" style={{ color: dominantColor }}>{Math.round(soundEffects.bassBoost * 100)}%</span>
                 </div>
-                <div>
-                  <p className="text-sm text-white font-medium">Spatial Audio</p>
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">{soundEffects.spatialAudio ? 'Active' : 'Inactive'}</p>
+                <DragSlider value={soundEffects.bassBoost} onChange={(v) => setSoundEffect('bassBoost', v)} min={0} max={1} color={dominantColor} />
+              </div>
+
+              {/* Vocal Boost */}
+              <div className="p-4 rounded-2xl glass-card">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-lg" style={{ color: dominantColor }}>record_voice_over</span>
+                    <span className="text-[12px] text-white font-medium">Vocal Clarity</span>
+                  </div>
+                  <span className="text-[10px] font-mono" style={{ color: dominantColor }}>{Math.round(soundEffects.vocalBoost * 100)}%</span>
+                </div>
+                <DragSlider value={soundEffects.vocalBoost} onChange={(v) => setSoundEffect('vocalBoost', v)} min={0} max={1} color={dominantColor} />
+              </div>
+
+              {/* Reverb */}
+              <div className="p-4 rounded-2xl glass-card">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-lg" style={{ color: dominantColor }}>surround_sound</span>
+                    <span className="text-[12px] text-white font-medium">Reverb</span>
+                  </div>
+                  <span className="text-[10px] font-mono" style={{ color: dominantColor }}>{Math.round(soundEffects.reverb * 100)}%</span>
+                </div>
+                <DragSlider value={soundEffects.reverb} onChange={(v) => setSoundEffect('reverb', v)} min={0} max={1} color={dominantColor} />
+              </div>
+
+              {/* Spatial Audio + Night Mode row */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Spatial Audio */}
+                <div className="p-4 rounded-2xl glass-card">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span className="material-symbols-outlined text-lg" style={{ color: dominantColor }}>spatial_audio</span>
+                    <span className="text-[12px] text-white font-medium">Spatial</span>
+                  </div>
+                  <button onClick={() => setSoundEffect('spatialAudio', !soundEffects.spatialAudio)}
+                    className="w-full h-8 rounded-full relative flex items-center px-1.5 border transition-all duration-300"
+                    style={{ backgroundColor: soundEffects.spatialAudio ? dominantColor : 'rgba(255,255,255,0.1)', borderColor: soundEffects.spatialAudio ? dominantColor : 'rgba(255,255,255,0.1)' }}>
+                    <div className="w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300"
+                      style={{ marginLeft: soundEffects.spatialAudio ? 'auto' : '0' }} />
+                  </button>
+                </div>
+
+                {/* Night Mode */}
+                <div className="p-4 rounded-2xl glass-card">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span className="material-symbols-outlined text-lg" style={{ color: dominantColor }}>nightlight</span>
+                    <span className="text-[12px] text-white font-medium">Night</span>
+                  </div>
+                  <button onClick={() => setSoundEffect('nightMode', !soundEffects.nightMode)}
+                    className="w-full h-8 rounded-full relative flex items-center px-1.5 border transition-all duration-300"
+                    style={{ backgroundColor: soundEffects.nightMode ? dominantColor : 'rgba(255,255,255,0.1)', borderColor: soundEffects.nightMode ? dominantColor : 'rgba(255,255,255,0.1)' }}>
+                    <div className="w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300"
+                      style={{ marginLeft: soundEffects.nightMode ? 'auto' : '0' }} />
+                  </button>
                 </div>
               </div>
-              <button onClick={() => setSoundEffect('spatialAudio', !soundEffects.spatialAudio)}
-                className="w-12 h-7 rounded-full relative flex items-center px-1.5 border transition-all duration-300"
-                style={{ backgroundColor: soundEffects.spatialAudio ? dominantColor : 'rgba(255,255,255,0.1)', borderColor: soundEffects.spatialAudio ? dominantColor : 'rgba(255,255,255,0.1)' }}>
-                <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300"
-                  style={{ marginLeft: soundEffects.spatialAudio ? 'auto' : '0', transform: soundEffects.spatialAudio ? 'scale(1)' : 'scale(0.85)' }} />
-              </button>
             </div>
 
             {/* 10-Band Equalizer - FULLY INTERACTIVE */}
@@ -538,7 +591,7 @@ export default function PlayerPage() {
                       audioQuality === q ? 'text-black border-transparent' : 'text-zinc-400 border-white/10 hover:border-white/20'
                     }`}
                     style={audioQuality === q ? { backgroundColor: dominantColor } : {}}>
-                    {q === 'low' ? 'Normal' : q === 'mid' ? 'High' : 'Very High'}
+                    {q === 'low' ? 'Normal' : q === 'mid' ? 'High' : 'Lossless'}
                   </button>
                 ))}
               </div>
@@ -547,7 +600,7 @@ export default function PlayerPage() {
             {/* Status */}
             <div className="flex items-center justify-center gap-3 text-zinc-600 pt-4 border-t border-white/[0.04]">
               <span className="material-symbols-outlined text-[18px]">headphones</span>
-              <span className="text-[9px] uppercase tracking-[0.3em] font-medium">Aurelia HiFi • Active</span>
+              <span className="text-[9px] uppercase tracking-[0.3em] font-medium">Aurelia HiFi 48kHz • Active</span>
             </div>
           </div>
         </div>

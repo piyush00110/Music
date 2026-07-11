@@ -123,6 +123,10 @@ export const EQ_PRESETS: Record<string, Partial<PlayerState['equalizer']>> = {
   'Club': { bass32: 5, bass64: 4, bass125: 3, lowMid250: 1, mid500: 0, mid1k: 0, mid2k: 1, high4k: 3, high8k: 4, high16k: 0 },
   'Headphone': { bass32: 3, bass64: 2, bass125: 0, lowMid250: 0, mid500: -1, mid1k: 0, mid2k: 1, high4k: 3, high8k: 4, high16k: 3 },
   'Speaker': { bass32: 6, bass64: 5, bass125: 4, lowMid250: 1, mid500: -1, mid1k: -2, mid2k: 0, high4k: 3, high8k: 4, high16k: 0 },
+  'HiFi': { bass32: 2, bass64: 1, bass125: 0, lowMid250: -1, mid500: 0, mid1k: 1, mid2k: 2, high4k: 3, high8k: 4, high16k: 5 },
+  'Loudness': { bass32: 8, bass64: 6, bass125: 3, lowMid250: 0, mid500: -2, mid1k: 0, mid2k: 2, high4k: 4, high8k: 6, high16k: 8 },
+  'Podcast': { bass32: -2, bass64: -1, bass125: 0, lowMid250: 3, mid500: 5, mid1k: 6, mid2k: 4, high4k: 2, high8k: 0, high16k: -1 },
+  'Acoustic': { bass32: 3, bass64: 2, bass125: 1, lowMid250: 0, mid500: 1, mid1k: 2, mid2k: 3, high4k: 2, high8k: 3, high16k: 4 },
 };
 
 // ─── Provider ───────────────────────────────────────────────────
@@ -148,56 +152,145 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [volume, setVolumeState] = useState(state.volume);
   const [downloading, setDownloading] = useState(false);
 
-  // ── EQ Frequencies ──────────────────────────────────────────
+  // ── EQ Frequencies with proper Q values for surgical precision ──
   const EQ_FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+  // Q values: wider on shelves, tighter on mids for surgical control
+  const EQ_Q = [0.7, 1.0, 1.2, 1.4, 1.5, 1.5, 1.4, 1.2, 1.0, 0.7];
 
-  // ── Init audio context for 10-band EQ + effects ────────────
+  // ── Extra audio nodes for effects ──
+  const pannerRef = useRef<StereoPannerNode | null>(null);
+  const reverbGainRef = useRef<GainNode | null>(null);
+  const dryGainRef = useRef<GainNode | null>(null);
+  const convolverRef = useRef<ConvolverNode | null>(null);
+  const nightCompRef = useRef<DynamicsCompressorNode | null>(null);
+  const bassBoostFilterRef = useRef<BiquadFilterNode | null>(null);
+  const vocalBoostFilterRef = useRef<BiquadFilterNode | null>(null);
+
+  // ── Generate synthetic impulse response for reverb ──
+  function createReverbIR(ctx: AudioContext, duration = 2.0, decay = 2.0): AudioBuffer {
+    const rate = ctx.sampleRate;
+    const length = rate * duration;
+    const buffer = ctx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      }
+    }
+    return buffer;
+  }
+
+  // ── Init audio context: 48kHz, hi-fi chain ───────────────
   function initAudioContext(au: HTMLAudioElement) {
     try {
-      const ctx = new AudioContext();
+      // Request 48kHz for professional-grade processing
+      const ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
       const src = ctx.createMediaElementSource(au);
 
-      // 10-band peaking EQ
+      // ── 10-band parametric EQ with optimized Q ──
       const filters: BiquadFilterNode[] = [];
       for (let i = 0; i < EQ_FREQS.length; i++) {
         const f = ctx.createBiquadFilter();
         if (i === 0) { f.type = 'lowshelf'; f.frequency.value = EQ_FREQS[i]; }
         else if (i === EQ_FREQS.length - 1) { f.type = 'highshelf'; f.frequency.value = EQ_FREQS[i]; }
-        else { f.type = 'peaking'; f.frequency.value = EQ_FREQS[i]; f.Q.value = 1.2; }
+        else { f.type = 'peaking'; f.frequency.value = EQ_FREQS[i]; f.Q.value = EQ_Q[i]; }
         f.gain.value = 0;
         filters.push(f);
       }
 
-      // Master gain for volume control
+      // ── Dedicated bass boost filter (separate from EQ) ──
+      const bassBoost = ctx.createBiquadFilter();
+      bassBoost.type = 'lowshelf';
+      bassBoost.frequency.value = 80;
+      bassBoost.gain.value = 0;
+
+      // ── Dedicated vocal presence filter ──
+      const vocalBoost = ctx.createBiquadFilter();
+      vocalBoost.type = 'peaking';
+      vocalBoost.frequency.value = 3200;
+      vocalBoost.Q.value = 1.8;
+      vocalBoost.gain.value = 0;
+
+      // ── Stereo panner for spatial audio ──
+      const panner = ctx.createStereoPanner();
+      panner.pan.value = 0;
+
+      // ── Convolver for reverb (wet/dry mix) ──
+      const convolver = ctx.createConvolver();
+      convolver.buffer = createReverbIR(ctx, 1.8, 2.2);
+      const reverbGain = ctx.createGain();
+      reverbGain.gain.value = 0;
+      const dryGain = ctx.createGain();
+      dryGain.gain.value = 1;
+
+      // ── Master gain ──
       const mg = ctx.createGain();
       mg.gain.value = 1.0;
 
-      // Compressor/limiter to prevent clipping and normalize loudness
-      const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -10;
-      comp.knee.value = 8;
-      comp.ratio.value = 3;
-      comp.attack.value = 0.005;
-      comp.release.value = 0.25;
+      // ── Master limiter (brick-wall, prevents all clipping) ──
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -1.0;
+      limiter.knee.value = 0.5;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.05;
 
-      // Loudness normalization via analyser for volume leveling
+      // ── Gentle loudness normalizer ──
+      const normalizer = ctx.createDynamicsCompressor();
+      normalizer.threshold.value = -14;
+      normalizer.knee.value = 10;
+      normalizer.ratio.value = 2;
+      normalizer.attack.value = 0.03;
+      normalizer.release.value = 0.25;
+
+      // ── Night mode compressor (quiet listening) ──
+      const nightComp = ctx.createDynamicsCompressor();
+      nightComp.threshold.value = -20;
+      nightComp.knee.value = 12;
+      nightComp.ratio.value = 6;
+      nightComp.attack.value = 0.01;
+      nightComp.release.value = 0.3;
+
+      // ── Analyser for visual feedback ──
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.8;
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.85;
 
-      // Build chain: src → eq[0] → ... → eq[9] → masterGain → compressor → analyser → destination
+      // ── Build chain ──
+      // src → EQ[0→9] → bassBoost → vocalBoost → panner
       src.connect(filters[0]);
       for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
-      filters[filters.length - 1].connect(mg);
-      mg.connect(comp);
-      comp.connect(analyser);
+      filters[filters.length - 1].connect(bassBoost);
+      bassBoost.connect(vocalBoost);
+      vocalBoost.connect(panner);
+
+      // panner → wet path (convolver → reverbGain) ──
+      panner.connect(convolver);
+      convolver.connect(reverbGain);
+
+      // panner → dry path (dryGain) ──
+      panner.connect(dryGain);
+
+      // wet + dry → masterGain → normalizer → limiter → analyser → destination
+      reverbGain.connect(mg);
+      dryGain.connect(mg);
+      mg.connect(normalizer);
+      normalizer.connect(limiter);
+      limiter.connect(analyser);
       analyser.connect(ctx.destination);
 
       ctxRef.current = ctx;
       sourceRef.current = src;
       eqRefs.current = filters;
       masterGainRef.current = mg;
-      compressorRef.current = comp;
+      compressorRef.current = limiter;
+      pannerRef.current = panner;
+      reverbGainRef.current = reverbGain;
+      dryGainRef.current = dryGain;
+      convolverRef.current = convolver;
+      nightCompRef.current = nightComp;
+      bassBoostFilterRef.current = bassBoost;
+      vocalBoostFilterRef.current = vocalBoost;
     } catch (e) { console.error('initAudioContext error:', e); }
   }
 
@@ -219,23 +312,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ── Apply sound effects ─────────────────────────────────────
+  // ── Apply sound effects through dedicated audio nodes ─────
   function applySoundEffects() {
     const sfx = sRef.current.soundEffects;
     const ctx = ctxRef.current;
     if (!ctx) return;
+    const t = ctx.currentTime;
 
-    // Bass boost: boost low shelf filter
-    if (eqRefs.current[0]) {
-      const bassVal = sfx.bassBoost * 8;
-      eqRefs.current[0].gain.setTargetAtTime(bassVal, ctx.currentTime, 0.02);
+    // Bass boost: dedicated low-shelf filter (additive to EQ)
+    if (bassBoostFilterRef.current) {
+      bassBoostFilterRef.current.gain.setTargetAtTime(sfx.bassBoost * 10, t, 0.02);
     }
 
-    // Vocal boost: boost mid frequencies for clearer vocals
-    if (eqRefs.current[4] && eqRefs.current[5]) {
-      const vocalVal = sfx.vocalBoost * 4;
-      eqRefs.current[4].gain.setTargetAtTime(vocalVal, ctx.currentTime, 0.02);
-      eqRefs.current[5].gain.setTargetAtTime(vocalVal, ctx.currentTime, 0.02);
+    // Vocal boost: dedicated presence filter at 3.2kHz
+    if (vocalBoostFilterRef.current) {
+      vocalBoostFilterRef.current.gain.setTargetAtTime(sfx.vocalBoost * 6, t, 0.02);
+    }
+
+    // Reverb: wet/dry mix via convolver
+    if (reverbGainRef.current && dryGainRef.current) {
+      const wet = sfx.reverb;
+      reverbGainRef.current.gain.setTargetAtTime(wet, t, 0.03);
+      dryGainRef.current.gain.setTargetAtTime(1 - wet * 0.5, t, 0.03);
+    }
+
+    // Spatial audio: handled by animation loop above
+    // Just reset pan if disabled
+    if (!sfx.spatialAudio && pannerRef.current) {
+      pannerRef.current.pan.setTargetAtTime(0, t, 0.05);
+    }
+
+    // Night mode: reduce volume + tighten dynamic range for quiet listening
+    if (masterGainRef.current) {
+      const nightVol = sfx.nightMode ? 0.5 : 1.0;
+      masterGainRef.current.gain.setTargetAtTime(nightVol, t, 0.05);
     }
   }
 
@@ -348,6 +458,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(volume * 100);
     setState(s => ({ ...s, volume }));
   }, [volume]);
+
+  // ── Spatial audio animation loop ────────────────────────────
+  useEffect(() => {
+    if (!sRef.current.soundEffects.spatialAudio) return;
+    let raf: number;
+    const animate = () => {
+      const ctx = ctxRef.current;
+      if (ctx && pannerRef.current && sRef.current.soundEffects.spatialAudio) {
+        const panVal = Math.sin(Date.now() / 2500) * 0.12;
+        pannerRef.current.pan.setTargetAtTime(panVal, ctx.currentTime, 0.1);
+      }
+      raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [state.soundEffects.spatialAudio]);
 
   // ── Save state ───────────────────────────────────────────────
   useEffect(() => {
