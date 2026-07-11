@@ -36,6 +36,10 @@ interface PlayerContextType extends PlayerState {
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
+declare global {
+  interface Window { YT: any; onYouTubeIframeAPIReady: (() => void) | null; }
+}
+
 const LS_KEY = 'aurelia-player-state';
 
 function loadSavedState(): Partial<PlayerState> {
@@ -78,6 +82,27 @@ function defaultState(): PlayerState {
   };
 }
 
+function useAudioSource(t: Track | null): boolean {
+  return !!t?.preview && !t?.youtubeId;
+}
+
+// ─── YouTube IFrame API loader ──────────────────────────────────
+let ytLoading: Promise<void> | null = null;
+function loadYTAPI(): Promise<void> {
+  if (ytLoading) return ytLoading;
+  if (typeof window === 'undefined') return Promise.resolve();
+  ytLoading = new Promise<void>(resolve => {
+    if (window.YT?.Player) { resolve(); return; }
+    const timer = setTimeout(() => { resolve(); }, 10000);
+    window.onYouTubeIframeAPIReady = () => { clearTimeout(timer); resolve(); };
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    s.onerror = () => { clearTimeout(timer); resolve(); };
+    document.head.appendChild(s);
+  });
+  return ytLoading;
+}
+
 // ─── EQ Band definitions ───────────────────────────────────────
 export const EQ_BANDS = [
   { key: 'bass32', freq: 32, label: '32Hz', type: 'lowshelf' as BiquadFilterType },
@@ -118,16 +143,20 @@ export const EQ_PRESETS: Record<string, Partial<PlayerState['equalizer']>> = {
 
 // ─── Provider ───────────────────────────────────────────────────
 export function PlayerProvider({ children }: { children: ReactNode }) {
+  const ytPlayerRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const nextAudioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const nextSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const eqRefs = useRef<BiquadFilterNode[]>([]);
   const masterGainRef = useRef<GainNode | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const sRef = useRef<PlayerState>(defaultState());
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const ytInitRef = useRef(false);
+  const playerReadyRef = useRef(false);
+  const ytFailedRef = useRef(false);
   const streamingRef = useRef(false);
+  const pendingPlayRef = useRef<string | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [state, setState] = useState<PlayerState>(defaultState);
@@ -148,15 +177,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const nightCompRef = useRef<DynamicsCompressorNode | null>(null);
   const bassBoostFilterRef = useRef<BiquadFilterNode | null>(null);
   const vocalBoostFilterRef = useRef<BiquadFilterNode | null>(null);
-  const stereoWidenLRef = useRef<GainNode | null>(null);
-  const stereoWidenRRef = useRef<GainNode | null>(null);
-  const stereoWidenMergerRef = useRef<ChannelMergerNode | null>(null);
-  const stereoWidenSplitterRef = useRef<ChannelSplitterNode | null>(null);
   const midGainRef = useRef<GainNode | null>(null);
   const sideGainRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const preGainRef = useRef<GainNode | null>(null);
-  const postLimiterGainRef = useRef<GainNode | null>(null);
 
   // ── Better reverb IR with early reflections + pre-delay ──
   function createReverbIR(ctx: AudioContext, duration = 2.5, decay = 2.5): AudioBuffer {
@@ -187,7 +211,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'playback' });
       const src = ctx.createMediaElementSource(au);
 
-      // 10-band parametric EQ
       const filters: BiquadFilterNode[] = [];
       for (let i = 0; i < EQ_FREQS.length; i++) {
         const f = ctx.createBiquadFilter();
@@ -212,7 +235,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const panner = ctx.createStereoPanner();
       panner.pan.value = 0;
 
-      // ── Stereo widener (mid-side processing) ──
       const splitter = ctx.createChannelSplitter(2);
       const merger = ctx.createChannelMerger(2);
       const midGain = ctx.createGain();
@@ -230,11 +252,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const mg = ctx.createGain();
       mg.gain.value = 1.0;
 
-      // Pre-gain (for auto-gain normalization)
       const preGain = ctx.createGain();
       preGain.gain.value = 1.0;
 
-      // Gentle loudness normalizer
       const normalizer = ctx.createDynamicsCompressor();
       normalizer.threshold.value = -14;
       normalizer.knee.value = 10;
@@ -242,7 +262,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       normalizer.attack.value = 0.03;
       normalizer.release.value = 0.25;
 
-      // Night mode compressor
       const nightComp = ctx.createDynamicsCompressor();
       nightComp.threshold.value = -20;
       nightComp.knee.value = 12;
@@ -250,7 +269,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       nightComp.attack.value = 0.01;
       nightComp.release.value = 0.3;
 
-      // Master limiter (brick-wall)
       const limiter = ctx.createDynamicsCompressor();
       limiter.threshold.value = -1.0;
       limiter.knee.value = 0.5;
@@ -258,48 +276,35 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       limiter.attack.value = 0.001;
       limiter.release.value = 0.05;
 
-      // Analyser for spectrum visualization
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.82;
 
-      // Post-limiter gain (for crossfade)
-      const postLimiterGain = ctx.createGain();
-      postLimiterGain.gain.value = 1.0;
-
       // ── Build chain ──
-      // src → EQ[0→9] → bassBoost → vocalBoost → panner
       src.connect(filters[0]);
       for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
       filters[filters.length - 1].connect(bassBoost);
       bassBoost.connect(vocalBoost);
       vocalBoost.connect(panner);
 
-      // panner → stereo widener (mid-side)
       panner.connect(splitter);
       splitter.connect(midGain, 0);
       splitter.connect(sideGain, 1);
       midGain.connect(merger, 0, 0);
       sideGain.connect(merger, 0, 1);
 
-      // merger → reverb wet path
       merger.connect(convolver);
       convolver.connect(reverbGain);
-
-      // panner → dry path
       merger.connect(dryGain);
 
-      // wet + dry → masterGain
       reverbGain.connect(mg);
       dryGain.connect(mg);
 
-      // masterGain → preGain → normalizer → limiter → analyser → postLimiterGain → destination
       mg.connect(preGain);
       preGain.connect(normalizer);
       normalizer.connect(limiter);
       limiter.connect(analyser);
-      analyser.connect(postLimiterGain);
-      postLimiterGain.connect(ctx.destination);
+      analyser.connect(ctx.destination);
 
       ctxRef.current = ctx;
       sourceRef.current = src;
@@ -313,13 +318,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       nightCompRef.current = nightComp;
       bassBoostFilterRef.current = bassBoost;
       vocalBoostFilterRef.current = vocalBoost;
-      stereoWidenSplitterRef.current = splitter;
-      stereoWidenMergerRef.current = merger;
       midGainRef.current = midGain;
       sideGainRef.current = sideGain;
       analyserRef.current = analyser;
       preGainRef.current = preGain;
-      postLimiterGainRef.current = postLimiterGain;
     } catch (e) { console.error('initAudioContext error:', e); }
   }
 
@@ -348,31 +350,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (bassBoostFilterRef.current) {
       bassBoostFilterRef.current.gain.setTargetAtTime(sfx.bassBoost * 10, t, 0.02);
     }
-
     if (vocalBoostFilterRef.current) {
       vocalBoostFilterRef.current.gain.setTargetAtTime(sfx.vocalBoost * 6, t, 0.02);
     }
-
     if (reverbGainRef.current && dryGainRef.current) {
-      const wet = sfx.reverb;
-      reverbGainRef.current.gain.setTargetAtTime(wet, t, 0.03);
-      dryGainRef.current.gain.setTargetAtTime(1 - wet * 0.5, t, 0.03);
+      reverbGainRef.current.gain.setTargetAtTime(sfx.reverb, t, 0.03);
+      dryGainRef.current.gain.setTargetAtTime(1 - sfx.reverb * 0.5, t, 0.03);
     }
-
-    // Stereo width: adjust mid/side balance
     if (midGainRef.current && sideGainRef.current) {
       const width = sfx.stereoWidth ?? 0.5;
-      const midLevel = 1.0 - width * 0.3;
-      const sideLevel = width * 0.8;
-      midGainRef.current.gain.setTargetAtTime(midLevel, t, 0.05);
-      sideGainRef.current.gain.setTargetAtTime(sideLevel, t, 0.05);
+      midGainRef.current.gain.setTargetAtTime(1.0 - width * 0.3, t, 0.05);
+      sideGainRef.current.gain.setTargetAtTime(width * 0.8, t, 0.05);
     }
-
     if (!sfx.spatialAudio && pannerRef.current) {
       pannerRef.current.pan.setTargetAtTime(0, t, 0.05);
     }
-
-    // Night mode: compression + volume reduction for quiet listening
     if (nightCompRef.current) {
       if (sfx.nightMode) {
         nightCompRef.current.threshold.setTargetAtTime(-18, t, 0.1);
@@ -382,10 +374,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         nightCompRef.current.ratio.setTargetAtTime(1, t, 0.1);
       }
     }
-
     if (masterGainRef.current) {
-      const nightVol = sfx.nightMode ? 0.55 : 1.0;
-      masterGainRef.current.gain.setTargetAtTime(nightVol, t, 0.05);
+      masterGainRef.current.gain.setTargetAtTime(sfx.nightMode ? 0.55 : 1.0, t, 0.05);
     }
   }
 
@@ -412,9 +402,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // ── Auto-gain: analyze loudness in first 3 seconds ──
   function startAutoGainAnalysis() {
     const analyser = analyserRef.current;
-    const ctx = ctxRef.current;
     const preGain = preGainRef.current;
-    if (!analyser || !ctx || !preGain) return;
+    if (!analyser || !preGain) return;
     const bufLen = analyser.frequencyBinCount;
     const data = new Float32Array(bufLen);
     let sampleCount = 0;
@@ -434,11 +423,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (avgRms > 0.001) {
           const currentLufs = 20 * Math.log10(avgRms) + 3;
           setLoudnessDb(Math.round(currentLufs));
-          const targetLufs = -14;
-          const gainDb = targetLufs - currentLufs;
+          const gainDb = -14 - currentLufs;
           const gainLinear = Math.pow(10, gainDb / 20);
           const clampedGain = Math.max(0.2, Math.min(3.0, gainLinear));
-          preGain.gain.setTargetAtTime(clampedGain, ctx.currentTime, 0.5);
+          if (ctxRef.current) preGain.gain.setTargetAtTime(clampedGain, ctxRef.current.currentTime, 0.5);
         }
       }
     }, 1000 / sampleRate);
@@ -464,12 +452,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // ── Init audio element ──
+  // ── Init: YouTube API + audio element ──────────────────────
   useEffect(() => {
+    const div = document.createElement('div');
+    div.id = 'yt-box';
+    div.style.display = 'none';
+    document.body.appendChild(div);
+    containerRef.current = div;
+
     const au = new Audio();
-    au.volume = 1;
+    au.volume = state.volume;
     au.crossOrigin = 'anonymous';
-    au.preload = 'auto';
     audioRef.current = au;
     initAudioContext(au);
 
@@ -479,9 +472,49 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('blur', ensureAudioContext);
 
+    loadYTAPI().then(() => {
+      if (!div || ytInitRef.current) return;
+      ytInitRef.current = true;
+      const YT = window.YT;
+      if (YT?.Player) {
+        try {
+          ytPlayerRef.current = new YT.Player(div, {
+            height: '0', width: '0',
+            playerVars: { autoplay: 0, controls: 0, disablekb: 1, enablejsapi: 1, fs: 0, modestbranding: 1, origin: window.location.origin },
+            events: {
+              onReady: () => {
+                playerReadyRef.current = true;
+                if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(state.volume * 100);
+                if (pendingPlayRef.current) {
+                  ytPlayerRef.current.loadVideoById(pendingPlayRef.current, 0, 'default');
+                  pendingPlayRef.current = null;
+                }
+              },
+              onStateChange: (e: any) => {
+                if (e.data === YT.PlayerState.PLAYING) {
+                  setState(s => ({ ...s, isPlaying: true, duration: ytPlayerRef.current?.getDuration?.() || s.duration }));
+                } else if (e.data === YT.PlayerState.PAUSED) {
+                  setState(s => ({ ...s, isPlaying: false }));
+                } else if (e.data === YT.PlayerState.ENDED) { onEnded(); }
+              },
+              onError: (e: any) => {
+                if (e.data === 150 || e.data === 100) {
+                  const t = sRef.current.currentTrack;
+                  if (t?.youtubeId) playViaStream(t.youtubeId);
+                  else { setAudioError('Playback unavailable'); setState(s => ({ ...s, isPlaying: false })); }
+                }
+              },
+            },
+          });
+        } catch { ytFailedRef.current = true; }
+      } else { ytFailedRef.current = true; }
+    });
+
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('blur', ensureAudioContext);
+      ytPlayerRef.current?.destroy();
+      div.remove();
       au.src = '';
       ctxRef.current?.close();
       releaseWakeLock();
@@ -490,10 +523,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
+    if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(volume * 100);
     setState(s => ({ ...s, volume }));
   }, [volume]);
 
-  // ── Spatial audio animation loop ──
   useEffect(() => {
     if (!sRef.current.soundEffects.spatialAudio) return;
     let raf: number;
@@ -509,7 +542,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => cancelAnimationFrame(raf);
   }, [state.soundEffects.spatialAudio]);
 
-  // ── Save state ──
   useEffect(() => {
     try {
       const eq = sRef.current.equalizer;
@@ -524,24 +556,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [volume, state.shuffle, state.repeat, state.audioQuality, state.equalizer, state.soundEffects, state.crossfade, state.crossfadeDuration]);
 
-  // ── Progress tick ──
   useEffect(() => {
     const iv = setInterval(() => {
       const s = sRef.current;
       if (!s.isPlaying || !s.currentTrack) return;
-      const au = audioRef.current;
-      if (au && streamingRef.current) {
-        setState(prev => ({ ...prev, progress: au.currentTime }));
-        // Crossfade: start next track before current ends
-        if (s.crossfade && s.crossfadeDuration > 0 && s.queueIndex < s.queue.length - 1) {
-          const remaining = au.duration - au.currentTime;
-          if (remaining <= s.crossfadeDuration && remaining > 0 && !crossfadeTimerRef.current) {
-            crossfadeTimerRef.current = setTimeout(() => {
-              crossfadeTimerRef.current = null;
-              doNext();
-            }, remaining * 1000);
-          }
-        }
+      if (streamingRef.current || useAudioSource(s.currentTrack)) {
+        if (audioRef.current) setState(prev => ({ ...prev, progress: audioRef.current!.currentTime }));
+      } else {
+        try { if (ytPlayerRef.current?.getCurrentTime) setState(prev => ({ ...prev, progress: ytPlayerRef.current.getCurrentTime() })); } catch {}
       }
     }, 250);
     return () => clearInterval(iv);
@@ -549,13 +571,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   function onEnded() {
     const s = sRef.current;
+    if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
     if (s.repeat === 'one') {
-      if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
-    } else if (s.repeat === 'all' || s.queueIndex < s.queue.length - 1) {
-      doNext();
-    } else {
-      setState(prev => ({ ...prev, isPlaying: false, progress: 0 }));
-    }
+      if (streamingRef.current || useAudioSource(s.currentTrack)) {
+        if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
+      } else {
+        ytPlayerRef.current?.seekTo(0); ytPlayerRef.current?.playVideo();
+      }
+    } else if (s.repeat === 'all' || s.queueIndex < s.queue.length - 1) { doNext(); }
+    else setState(prev => ({ ...prev, isPlaying: false, progress: 0 }));
   }
 
   function doNext() {
@@ -572,9 +596,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!s.queue.length) return;
     if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
     if (s.progress > 3) {
-      if (audioRef.current) audioRef.current.currentTime = 0;
-      setState(s => ({ ...s, progress: 0 }));
-      return;
+      if (streamingRef.current || useAudioSource(s.currentTrack)) { if (audioRef.current) audioRef.current.currentTime = 0; }
+      else ytPlayerRef.current?.seekTo(0);
+      setState(s => ({ ...s, progress: 0 })); return;
     }
     const idx = s.shuffle ? Math.floor(Math.random() * s.queue.length) : (s.queueIndex - 1 + s.queue.length) % s.queue.length;
     const t = s.queue[idx];
@@ -603,26 +627,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     navigator.mediaSession.setActionHandler('stop', () => pause());
   }
 
-  // ── Crossfade: fade out current audio ──
   function fadeOutCurrent(duration: number) {
     const au = audioRef.current;
-    const ctx = ctxRef.current;
-    if (!au || !ctx) return;
+    if (!au) return;
     const currentVol = sRef.current.volume;
-    au.volume = currentVol;
     const steps = 20;
     const stepTime = (duration * 1000) / steps;
     let step = 0;
     const fade = setInterval(() => {
       step++;
-      if (step >= steps) {
-        clearInterval(fade);
-        au.volume = 0;
-        au.pause();
-        au.volume = currentVol;
-      } else {
-        au.volume = currentVol * (1 - step / steps);
-      }
+      if (step >= steps) { clearInterval(fade); au.volume = 0; au.pause(); au.volume = currentVol; }
+      else { au.volume = currentVol * (1 - step / steps); }
     }, stepTime);
   }
 
@@ -634,12 +649,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const queue = q || [track];
     const idx = q ? q.findIndex(t => t.id === track.id) : 0;
 
-    // Crossfade: fade out current before switching
-    const isCrossfading = sRef.current.crossfade && streamingRef.current && audioRef.current && audioRef.current.duration > 0;
-    if (isCrossfading) {
-      fadeOutCurrent(Math.min(sRef.current.crossfadeDuration, 2));
-    }
-
     setState(s => {
       const rp = s.recentlyPlayed.filter(t => t.id !== track.id);
       rp.unshift(track);
@@ -650,24 +659,54 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     applyEQ();
     applySoundEffects();
 
-    // Always stream YouTube tracks through our audio chain
+    // ── YouTube track: try IFrame API first, fallback to stream ──
     if (track.youtubeId) {
-      playViaStream(track.youtubeId, queue, idx);
+      streamingRef.current = false;
+
+      // Try YouTube IFrame API first (always works on Vercel)
+      if (playerReadyRef.current && ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.loadVideoById(track.youtubeId, 0, 'default');
+          audioRef.current!.src = '';
+          if (state.audioQuality === 'high') ytPlayerRef.current.setPlaybackQuality('hd1080');
+          else if (state.audioQuality === 'mid') ytPlayerRef.current.setPlaybackQuality('hd720');
+          else ytPlayerRef.current.setPlaybackQuality('medium');
+          return;
+        } catch {}
+      }
+      if (ytFailedRef.current) {
+        // IFrame failed, try stream API (yt-dlp)
+        playViaStream(track.youtubeId, queue, idx);
+        return;
+      }
+      pendingPlayRef.current = track.youtubeId;
       return;
     }
 
-    // Search YouTube for tracks without YouTube ID
+    // ── No YouTube ID — search YouTube first, then play ──
     try {
       const found = await findOnYouTube(track.title, track.artist.name);
       if (found) {
         track.youtubeId = found;
-        playViaStream(found, queue, idx);
+        if (playerReadyRef.current && ytPlayerRef.current) {
+          try {
+            ytPlayerRef.current.loadVideoById(found, 0, 'default');
+            audioRef.current!.src = '';
+            return;
+          } catch {}
+        }
+        if (ytFailedRef.current) {
+          playViaStream(found, queue, idx);
+          return;
+        }
+        pendingPlayRef.current = found;
         return;
       }
     } catch {}
 
-    // Fallback: direct audio preview (Audius/Deezer/etc.)
+    // ── Last resort: direct audio preview (Audius/Deezer) ──
     if (track.preview && audioRef.current) {
+      ytPlayerRef.current?.stopVideo();
       streamingRef.current = true;
       audioRef.current.src = track.preview;
       audioRef.current.volume = sRef.current.volume;
@@ -687,10 +726,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   async function playViaStream(youtubeId: string, queue?: Track[], idx?: number) {
     streamingRef.current = false;
     try {
+      ytPlayerRef.current?.stopVideo();
       const res = await fetch(`/api/stream?id=${youtubeId}`);
       const data = await res.json();
       if (!data.url) throw new Error('No stream URL');
       if (data.fallback) {
+        // Stream API returned YouTube URL (yt-dlp not available), try opening in new tab as last resort
+        // But first, try playing via YT IFrame with the video ID
+        if (playerReadyRef.current && ytPlayerRef.current) {
+          try {
+            ytPlayerRef.current.loadVideoById(youtubeId, 0, 'default');
+            audioRef.current!.src = '';
+            streamingRef.current = false;
+            return;
+          } catch {}
+        }
         window.open(data.url, '_blank');
         setAudioError('Opening in YouTube...');
         setState(s => ({ ...s, isPlaying: false }));
@@ -707,6 +757,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         startAutoGainAnalysis();
       }
     } catch {
+      // Stream failed, try YT IFrame as absolute last resort
+      if (playerReadyRef.current && ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.loadVideoById(youtubeId, 0, 'default');
+          audioRef.current!.src = '';
+          streamingRef.current = false;
+          return;
+        } catch {}
+      }
       setAudioError('Stream unavailable');
       setState(s => ({ ...s, isPlaying: false }));
     }
@@ -714,13 +773,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const play = useCallback((track: Track, queue?: Track[]) => doPlay(track, queue), []);
   const pause = useCallback(() => {
-    audioRef.current?.pause();
+    const s = sRef.current;
+    if (streamingRef.current || useAudioSource(s.currentTrack)) audioRef.current?.pause();
+    else ytPlayerRef.current?.pauseVideo();
     setState(s => ({ ...s, isPlaying: false }));
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   }, []);
   const resume = useCallback(() => {
+    const s = sRef.current;
     ensureAudioContext();
-    audioRef.current?.play().catch(() => {});
+    if (streamingRef.current || useAudioSource(s.currentTrack)) {
+      audioRef.current?.play().catch(() => {});
+    } else ytPlayerRef.current?.playVideo();
     setState(s => ({ ...s, isPlaying: true }));
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
   }, []);
@@ -728,7 +792,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const prev = useCallback(() => doPrev(), []);
   const setVolume = useCallback((v: number) => setVolumeState(Math.max(0, Math.min(1, v))), []);
   const seek = useCallback((t: number) => {
-    if (audioRef.current) audioRef.current.currentTime = t;
+    const s = sRef.current;
+    if (streamingRef.current || useAudioSource(s.currentTrack)) { if (audioRef.current) audioRef.current.currentTime = t; }
+    else ytPlayerRef.current?.seekTo(t);
     setState(s => ({ ...s, progress: t }));
   }, []);
 
@@ -760,6 +826,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const setAudioQuality = useCallback((q: string) => {
     setState(s => ({ ...s, audioQuality: q as any }));
+    // If playing via YT IFrame, update quality immediately
+    if (ytPlayerRef.current?.setPlaybackQuality && !streamingRef.current) {
+      const map: Record<string, string> = { low: 'small', mid: 'medium', high: 'hd720' };
+      ytPlayerRef.current.setPlaybackQuality(map[q] || 'medium');
+    }
   }, []);
 
   const setEqualizer = useCallback((bandOrMode: string, val: number) => {
