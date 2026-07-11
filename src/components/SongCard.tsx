@@ -43,7 +43,7 @@ export default function SongCard({ track, index, queue, showIndex }: Props) {
     }
   };
 
-  const artSrc = track.album.cover_medium || (track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/default.jpg` : null);
+  const artSrc = track.album.cover_medium || (track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg` : null);
 
   return (
     <div

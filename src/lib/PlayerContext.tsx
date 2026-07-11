@@ -172,20 +172,26 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const mg = ctx.createGain();
       mg.gain.value = 1.0;
 
-      // Compressor/limiter to prevent clipping
+      // Compressor/limiter to prevent clipping and normalize loudness
       const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -6;
-      comp.knee.value = 6;
-      comp.ratio.value = 4;
-      comp.attack.value = 0.003;
-      comp.release.value = 0.15;
+      comp.threshold.value = -10;
+      comp.knee.value = 8;
+      comp.ratio.value = 3;
+      comp.attack.value = 0.005;
+      comp.release.value = 0.25;
 
-      // Build chain: src → eq[0] → ... → eq[9] → masterGain → compressor → destination
+      // Loudness normalization via analyser for volume leveling
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+
+      // Build chain: src → eq[0] → ... → eq[9] → masterGain → compressor → analyser → destination
       src.connect(filters[0]);
       for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
       filters[filters.length - 1].connect(mg);
       mg.connect(comp);
-      comp.connect(ctx.destination);
+      comp.connect(analyser);
+      analyser.connect(ctx.destination);
 
       ctxRef.current = ctx;
       sourceRef.current = src;
@@ -215,8 +221,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // ── Apply sound effects ─────────────────────────────────────
   function applySoundEffects() {
-    // Spatial audio via stereo panner not available in this chain
-    // Effects are visual indicators for now
+    const sfx = sRef.current.soundEffects;
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+
+    // Bass boost: boost low shelf filter
+    if (eqRefs.current[0]) {
+      const bassVal = sfx.bassBoost * 8;
+      eqRefs.current[0].gain.setTargetAtTime(bassVal, ctx.currentTime, 0.02);
+    }
+
+    // Vocal boost: boost mid frequencies for clearer vocals
+    if (eqRefs.current[4] && eqRefs.current[5]) {
+      const vocalVal = sfx.vocalBoost * 4;
+      eqRefs.current[4].gain.setTargetAtTime(vocalVal, ctx.currentTime, 0.02);
+      eqRefs.current[5].gain.setTargetAtTime(vocalVal, ctx.currentTime, 0.02);
+    }
   }
 
   // ── Acquire Wake Lock for background playback ───────────────
@@ -436,10 +456,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       streamingRef.current = false;
       if (playerReadyRef.current && ytPlayerRef.current) {
         try {
-          ytPlayerRef.current.loadVideoById(track.youtubeId, 0, 'default');
+          ytPlayerRef.current.loadVideoById(track.youtubeId, 0, 'hd720');
           audioRef.current!.src = '';
-          if (state.audioQuality !== 'mid') {
-            ytPlayerRef.current.setPlaybackQuality(state.audioQuality === 'high' ? 'hd720' : 'small');
+          if (state.audioQuality === 'high') {
+            ytPlayerRef.current.setPlaybackQuality('hd1080');
+          } else if (state.audioQuality === 'mid') {
+            ytPlayerRef.current.setPlaybackQuality('hd720');
+          } else {
+            ytPlayerRef.current.setPlaybackQuality('medium');
           }
           return;
         } catch {}

@@ -14,28 +14,32 @@ function trackFromItem(v: any, i: number): Track {
   };
 
   if (v.source === 'youtube') {
+    const vid = v.videoId || v.stream || '';
+    const thumb = v.cover || (vid ? `https://i.ytimg.com/vi/${vid}/hqdefault.jpg` : '');
     base.album.title = v.channel || 'YouTube';
-    base.album.cover_medium = v.cover || '';
-    base.album.cover = v.cover || '';
-    base.album.cover_small = v.cover || '';
-    base.preview = v.stream || v.videoId || '';
-    return { ...base, youtubeId: v.videoId || v.stream || '' };
+    base.album.cover_medium = thumb;
+    base.album.cover = thumb;
+    base.album.cover_small = thumb;
+    base.preview = v.stream || vid || '';
+    return { ...base, youtubeId: vid };
   }
 
   if (v.source === 'audius') {
+    const cover = v.cover || '';
     base.album.title = v.title || '';
-    base.album.cover = v.cover || '';
-    base.album.cover_small = v.cover || '';
-    base.album.cover_medium = v.cover || '';
+    base.album.cover = cover;
+    base.album.cover_small = cover;
+    base.album.cover_medium = cover;
     base.preview = `${AUDIUS}/v1/tracks/${v.stream}/stream`;
     return base;
   }
 
   if (v.source === 'deezer') {
+    const cover = v.cover || '';
     base.album.title = '';
-    base.album.cover = v.cover || '';
-    base.album.cover_small = v.cover || '';
-    base.album.cover_medium = v.cover || '';
+    base.album.cover = cover;
+    base.album.cover_small = cover;
+    base.album.cover_medium = cover;
     base.preview = v.stream || '';
     return base;
   }

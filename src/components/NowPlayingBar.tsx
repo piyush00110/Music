@@ -16,7 +16,7 @@ export default function NowPlayingBar() {
   };
 
   const artSrc = currentTrack.youtubeId
-    ? `https://i.ytimg.com/vi/${currentTrack.youtubeId}/default.jpg`
+    ? `https://i.ytimg.com/vi/${currentTrack.youtubeId}/hqdefault.jpg`
     : currentTrack.album.cover_medium;
 
   return (

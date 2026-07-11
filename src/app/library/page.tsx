@@ -109,7 +109,7 @@ export default function LibraryPage() {
                 <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
                   {track.album.cover_medium || track.youtubeId ? (
                     <img
-                      src={track.album.cover_medium || (track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/default.jpg` : '')}
+                      src={track.album.cover_medium || (track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg` : '')}
                       alt=""
                       className="w-full h-full object-cover"
                       loading="lazy"
@@ -133,7 +133,7 @@ export default function LibraryPage() {
                 <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
                   {item.track.album.cover_medium || item.track.youtubeId ? (
                     <img
-                      src={item.track.album.cover_medium || (item.track.youtubeId ? `https://i.ytimg.com/vi/${item.track.youtubeId}/default.jpg` : '')}
+                      src={item.track.album.cover_medium || (item.track.youtubeId ? `https://i.ytimg.com/vi/${item.track.youtubeId}/hqdefault.jpg` : '')}
                       alt=""
                       className="w-full h-full object-cover"
                       loading="lazy"

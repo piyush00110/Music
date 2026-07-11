@@ -22,20 +22,7 @@ const GENRE_COLORS: Record<string, string> = {
   'Bollywood': 'from-rose-500/30 to-pink-600/30',
 };
 
-const GENRE_IMAGES: Record<string, string> = {
-  'Pop': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Hip Hop': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Rock': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Electronic': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'R&B': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Classical': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Jazz': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'LoFi': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Country': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Latin': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Punjabi': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-  'Bollywood': 'https://i.scdn.co/image/ab67706f00000002ca4a5f27e7f1f2e3e3e3e3e3',
-};
+// Genre images removed — using gradient cards instead (no broken external URLs)
 
 export default function HomePage() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -98,11 +85,26 @@ export default function HomePage() {
               className="flex items-center gap-3 bg-white/[0.06] hover:bg-white/[0.1] rounded-lg overflow-hidden transition-all duration-300 active:scale-[0.98] group text-left"
             >
               <div className="w-12 h-12 flex-shrink-0 relative overflow-hidden">
-                {track.album.cover_medium || track.youtubeId ? (
+                {(track.album.cover_medium || track.youtubeId) ? (
                   <img
-                    src={track.album.cover_medium || (track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/default.jpg` : '')}
+                    src={track.album.cover_medium || `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`}
                     alt=""
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      if (track.youtubeId && !img.src.includes('hqdefault')) {
+                        img.src = `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`;
+                      } else {
+                        img.style.display = 'none';
+                        const parent = img.parentElement;
+                        if (parent && !parent.querySelector('.fallback-icon')) {
+                          const div = document.createElement('div');
+                          div.className = 'fallback-icon w-full h-full bg-zinc-700 flex items-center justify-center absolute inset-0';
+                          div.innerHTML = '<span class="material-symbols-outlined text-zinc-500 text-sm">music_note</span>';
+                          parent.appendChild(div);
+                        }
+                      }
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-zinc-700 flex items-center justify-center">
@@ -253,12 +255,27 @@ export default function HomePage() {
               className="group rounded-xl overflow-hidden bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.12] cursor-pointer playlist-card"
             >
               <div className="relative w-full aspect-square overflow-hidden">
-                {track.album.cover_medium || track.youtubeId ? (
+                {(track.album.cover_medium || track.youtubeId) ? (
                   <img
-                    src={track.album.cover_medium || (track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg` : '')}
+                    src={track.album.cover_medium || `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`}
                     alt=""
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      if (track.youtubeId && !img.src.includes('hqdefault')) {
+                        img.src = `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`;
+                      } else {
+                        img.style.display = 'none';
+                        const parent = img.parentElement;
+                        if (parent && !parent.querySelector('.fallback-icon')) {
+                          const div = document.createElement('div');
+                          div.className = 'fallback-icon w-full h-full bg-zinc-800 flex items-center justify-center absolute inset-0';
+                          div.innerHTML = '<span class="material-symbols-outlined text-zinc-600 text-3xl">music_note</span>';
+                          parent.appendChild(div);
+                        }
+                      }
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-zinc-800 flex items-center justify-center">

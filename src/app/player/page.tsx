@@ -567,7 +567,7 @@ export default function PlayerPage() {
           </div>
           <div className="flex-1 overflow-y-auto px-5 pb-24 space-y-0.5">
             {queue.map((track, i) => {
-              const trackSrc = track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/default.jpg` : (track.album.cover_small || track.album.cover_medium);
+              const trackSrc = track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg` : (track.album.cover_small || track.album.cover_medium);
               return (
                 <div key={`${track.source || 'queue'}-${track.id}`}
                   className="flex items-center gap-3 p-2.5 rounded-xl transition-all border border-transparent"
