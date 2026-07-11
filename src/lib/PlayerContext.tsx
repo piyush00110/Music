@@ -24,16 +24,17 @@ interface PlayerContextType extends PlayerState {
   setAudioQuality: (q: string) => void;
   setEqualizer: (band: string, val: number) => void;
   setSoundEffect: (effect: string, val: number | boolean) => void;
+  setCrossfadeDuration: (d: number) => void;
+  toggleCrossfade: () => void;
   audioContext: AudioContext | null;
   eqFilters: BiquadFilterNode[];
   masterGain: GainNode | null;
+  analyserNode: AnalyserNode | null;
+  liveSpectrum: Uint8Array;
+  loudnessDb: number;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
-
-declare global {
-  interface Window { YT: any; onYouTubeIframeAPIReady: (() => void) | null; }
-}
 
 const LS_KEY = 'aurelia-player-state';
 
@@ -68,36 +69,13 @@ function defaultState(): PlayerState {
     volume: s.volume ?? 0.7, progress: 0, duration: 0,
     shuffle: s.shuffle ?? false, repeat: s.repeat ?? 'off',
     recentlyPlayed: [],
-    playbackSpeed: 1, crossfade: false,
+    playbackSpeed: 1, crossfade: s.crossfade ?? true,
+    crossfadeDuration: s.crossfadeDuration ?? 3,
     showEqualizer: false, showSoundEffects: false, nowPlayingView: 'artwork',
     audioQuality: s.audioQuality || 'high', downloadFormat: 'mp3',
     equalizer: migrateEQ(s.equalizer),
-    soundEffects: { reverb: 0, bassBoost: 0, surround3D: 0, vocalBoost: 0, nightMode: false },
+    soundEffects: { reverb: 0, bassBoost: 0, surround3D: 0, vocalBoost: 0, nightMode: false, stereoWidth: 0.5 },
   };
-}
-
-function useAudioSource(t: Track | null): boolean {
-  return !!t?.preview && !t?.youtubeId;
-}
-
-// ─── YouTube IFrame API loader ──────────────────────────────────
-let ytLoading: Promise<void> | null = null;
-function loadYTAPI(): Promise<void> {
-  if (ytLoading) return ytLoading;
-  if (typeof window === 'undefined') return Promise.resolve();
-  ytLoading = new Promise<void>(resolve => {
-    if (window.YT?.Player) { resolve(); return; }
-    const timer = setTimeout(() => {
-      console.warn('YouTube IFrame API timed out');
-      resolve();
-    }, 10000);
-    window.onYouTubeIframeAPIReady = () => { clearTimeout(timer); resolve(); };
-    const s = document.createElement('script');
-    s.src = 'https://www.youtube.com/iframe_api';
-    s.onerror = () => { clearTimeout(timer); resolve(); };
-    document.head.appendChild(s);
-  });
-  return ytLoading;
 }
 
 // ─── EQ Band definitions ───────────────────────────────────────
@@ -127,37 +105,42 @@ export const EQ_PRESETS: Record<string, Partial<PlayerState['equalizer']>> = {
   'Loudness': { bass32: 8, bass64: 6, bass125: 3, lowMid250: 0, mid500: -2, mid1k: 0, mid2k: 2, high4k: 4, high8k: 6, high16k: 8 },
   'Podcast': { bass32: -2, bass64: -1, bass125: 0, lowMid250: 3, mid500: 5, mid1k: 6, mid2k: 4, high4k: 2, high8k: 0, high16k: -1 },
   'Acoustic': { bass32: 3, bass64: 2, bass125: 1, lowMid250: 0, mid500: 1, mid1k: 2, mid2k: 3, high4k: 2, high8k: 3, high16k: 4 },
+  'Jazz': { bass32: 4, bass64: 3, bass125: 1, lowMid250: 2, mid500: 4, mid1k: 5, mid2k: 4, high4k: 3, high8k: 5, high16k: 6 },
+  'Classical': { bass32: 3, bass64: 2, bass125: 0, lowMid250: -1, mid500: -2, mid1k: 0, mid2k: 2, high4k: 4, high8k: 5, high16k: 6 },
+  'Hip-Hop': { bass32: 9, bass64: 7, bass125: 5, lowMid250: 2, mid500: -1, mid1k: -2, mid2k: 1, high4k: 3, high8k: 4, high16k: 2 },
+  'R&B': { bass32: 5, bass64: 4, bass125: 3, lowMid250: 2, mid500: 3, mid1k: 4, mid2k: 3, high4k: 2, high8k: 3, high16k: 2 },
+  'Electronic': { bass32: 8, bass64: 6, bass125: 2, lowMid250: -1, mid500: -3, mid1k: 0, mid2k: 2, high4k: 4, high8k: 6, high16k: 8 },
+  'Metal': { bass32: 5, bass64: 4, bass125: 0, lowMid250: -2, mid500: -3, mid1k: 0, mid2k: 3, high4k: 5, high8k: 6, high16k: 4 },
+  'Folk': { bass32: 2, bass64: 1, bass125: 0, lowMid250: 2, mid500: 4, mid1k: 5, mid2k: 4, high4k: 3, high8k: 2, high16k: 1 },
+  'Ambient': { bass32: 4, bass64: 3, bass125: 2, lowMid250: 1, mid500: 0, mid1k: -1, mid2k: -2, high4k: 1, high8k: 3, high16k: 5 },
+  'Pop': { bass32: 4, bass64: 3, bass125: 2, lowMid250: 0, mid500: 2, mid1k: 4, mid2k: 3, high4k: 2, high8k: 3, high16k: 2 },
 };
 
 // ─── Provider ───────────────────────────────────────────────────
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const ytPlayerRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const nextAudioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const nextSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const eqRefs = useRef<BiquadFilterNode[]>([]);
   const masterGainRef = useRef<GainNode | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const sRef = useRef<PlayerState>(defaultState());
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const ytInitRef = useRef(false);
-  const playerReadyRef = useRef(false);
-  const ytFailedRef = useRef(false);
   const streamingRef = useRef(false);
-  const pendingPlayRef = useRef<string | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [state, setState] = useState<PlayerState>(defaultState);
   const [audioError, setAudioError] = useState<string | null>(null);
   sRef.current = state;
   const [volume, setVolumeState] = useState(state.volume);
   const [downloading, setDownloading] = useState(false);
+  const [liveSpectrum, setLiveSpectrum] = useState<Uint8Array>(new Uint8Array(64));
+  const [loudnessDb, setLoudnessDb] = useState(-14);
 
-  // ── EQ Frequencies with proper Q values for surgical precision ──
   const EQ_FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-  // Q values: wider on shelves, tighter on mids for surgical control
   const EQ_Q = [0.7, 1.0, 1.2, 1.4, 1.5, 1.5, 1.4, 1.2, 1.0, 0.7];
 
-  // ── Extra audio nodes for effects ──
   const pannerRef = useRef<StereoPannerNode | null>(null);
   const reverbGainRef = useRef<GainNode | null>(null);
   const dryGainRef = useRef<GainNode | null>(null);
@@ -165,29 +148,46 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const nightCompRef = useRef<DynamicsCompressorNode | null>(null);
   const bassBoostFilterRef = useRef<BiquadFilterNode | null>(null);
   const vocalBoostFilterRef = useRef<BiquadFilterNode | null>(null);
+  const stereoWidenLRef = useRef<GainNode | null>(null);
+  const stereoWidenRRef = useRef<GainNode | null>(null);
+  const stereoWidenMergerRef = useRef<ChannelMergerNode | null>(null);
+  const stereoWidenSplitterRef = useRef<ChannelSplitterNode | null>(null);
+  const midGainRef = useRef<GainNode | null>(null);
+  const sideGainRef = useRef<GainNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const preGainRef = useRef<GainNode | null>(null);
+  const postLimiterGainRef = useRef<GainNode | null>(null);
 
-  // ── Generate synthetic impulse response for reverb ──
-  function createReverbIR(ctx: AudioContext, duration = 2.0, decay = 2.0): AudioBuffer {
+  // ── Better reverb IR with early reflections + pre-delay ──
+  function createReverbIR(ctx: AudioContext, duration = 2.5, decay = 2.5): AudioBuffer {
     const rate = ctx.sampleRate;
-    const length = rate * duration;
+    const preDelaySamples = Math.floor(rate * 0.02);
+    const length = rate * duration + preDelaySamples;
     const buffer = ctx.createBuffer(2, length, rate);
     for (let ch = 0; ch < 2; ch++) {
       const data = buffer.getChannelData(ch);
       for (let i = 0; i < length; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+        if (i < preDelaySamples) {
+          data[i] = 0;
+        } else {
+          const t = (i - preDelaySamples) / (length - preDelaySamples);
+          const earlyReflection = i < rate * 0.08 ? (Math.random() * 2 - 1) * 0.6 * Math.pow(1 - t, 4) : 0;
+          const lateReverb = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+          const density = Math.min(1, t * 3);
+          data[i] = earlyReflection * (1 - density * 0.5) + lateReverb * density * 0.7;
+        }
       }
     }
     return buffer;
   }
 
-  // ── Init audio context: 48kHz, hi-fi chain ───────────────
+  // ── Init audio context: 48kHz, hi-fi chain ──
   function initAudioContext(au: HTMLAudioElement) {
     try {
-      // Request 48kHz for professional-grade processing
-      const ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+      const ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'playback' });
       const src = ctx.createMediaElementSource(au);
 
-      // ── 10-band parametric EQ with optimized Q ──
+      // 10-band parametric EQ
       const filters: BiquadFilterNode[] = [];
       for (let i = 0; i < EQ_FREQS.length; i++) {
         const f = ctx.createBiquadFilter();
@@ -198,44 +198,43 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         filters.push(f);
       }
 
-      // ── Dedicated bass boost filter (separate from EQ) ──
       const bassBoost = ctx.createBiquadFilter();
       bassBoost.type = 'lowshelf';
       bassBoost.frequency.value = 80;
       bassBoost.gain.value = 0;
 
-      // ── Dedicated vocal presence filter ──
       const vocalBoost = ctx.createBiquadFilter();
       vocalBoost.type = 'peaking';
       vocalBoost.frequency.value = 3200;
       vocalBoost.Q.value = 1.8;
       vocalBoost.gain.value = 0;
 
-      // ── Stereo panner for spatial audio ──
       const panner = ctx.createStereoPanner();
       panner.pan.value = 0;
 
-      // ── Convolver for reverb (wet/dry mix) ──
+      // ── Stereo widener (mid-side processing) ──
+      const splitter = ctx.createChannelSplitter(2);
+      const merger = ctx.createChannelMerger(2);
+      const midGain = ctx.createGain();
+      const sideGain = ctx.createGain();
+      midGain.gain.value = 1.0;
+      sideGain.gain.value = 0.0;
+
       const convolver = ctx.createConvolver();
-      convolver.buffer = createReverbIR(ctx, 1.8, 2.2);
+      convolver.buffer = createReverbIR(ctx, 2.5, 2.5);
       const reverbGain = ctx.createGain();
       reverbGain.gain.value = 0;
       const dryGain = ctx.createGain();
       dryGain.gain.value = 1;
 
-      // ── Master gain ──
       const mg = ctx.createGain();
       mg.gain.value = 1.0;
 
-      // ── Master limiter (brick-wall, prevents all clipping) ──
-      const limiter = ctx.createDynamicsCompressor();
-      limiter.threshold.value = -1.0;
-      limiter.knee.value = 0.5;
-      limiter.ratio.value = 20;
-      limiter.attack.value = 0.001;
-      limiter.release.value = 0.05;
+      // Pre-gain (for auto-gain normalization)
+      const preGain = ctx.createGain();
+      preGain.gain.value = 1.0;
 
-      // ── Gentle loudness normalizer ──
+      // Gentle loudness normalizer
       const normalizer = ctx.createDynamicsCompressor();
       normalizer.threshold.value = -14;
       normalizer.knee.value = 10;
@@ -243,7 +242,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       normalizer.attack.value = 0.03;
       normalizer.release.value = 0.25;
 
-      // ── Night mode compressor (quiet listening) ──
+      // Night mode compressor
       const nightComp = ctx.createDynamicsCompressor();
       nightComp.threshold.value = -20;
       nightComp.knee.value = 12;
@@ -251,10 +250,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       nightComp.attack.value = 0.01;
       nightComp.release.value = 0.3;
 
-      // ── Analyser for visual feedback ──
+      // Master limiter (brick-wall)
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -1.0;
+      limiter.knee.value = 0.5;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.05;
+
+      // Analyser for spectrum visualization
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.85;
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.82;
+
+      // Post-limiter gain (for crossfade)
+      const postLimiterGain = ctx.createGain();
+      postLimiterGain.gain.value = 1.0;
 
       // ── Build chain ──
       // src → EQ[0→9] → bassBoost → vocalBoost → panner
@@ -264,20 +275,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       bassBoost.connect(vocalBoost);
       vocalBoost.connect(panner);
 
-      // panner → wet path (convolver → reverbGain) ──
-      panner.connect(convolver);
+      // panner → stereo widener (mid-side)
+      panner.connect(splitter);
+      splitter.connect(midGain, 0);
+      splitter.connect(sideGain, 1);
+      midGain.connect(merger, 0, 0);
+      sideGain.connect(merger, 0, 1);
+
+      // merger → reverb wet path
+      merger.connect(convolver);
       convolver.connect(reverbGain);
 
-      // panner → dry path (dryGain) ──
-      panner.connect(dryGain);
+      // panner → dry path
+      merger.connect(dryGain);
 
-      // wet + dry → masterGain → normalizer → limiter → analyser → destination
+      // wet + dry → masterGain
       reverbGain.connect(mg);
       dryGain.connect(mg);
-      mg.connect(normalizer);
+
+      // masterGain → preGain → normalizer → limiter → analyser → postLimiterGain → destination
+      mg.connect(preGain);
+      preGain.connect(normalizer);
       normalizer.connect(limiter);
       limiter.connect(analyser);
-      analyser.connect(ctx.destination);
+      analyser.connect(postLimiterGain);
+      postLimiterGain.connect(ctx.destination);
 
       ctxRef.current = ctx;
       sourceRef.current = src;
@@ -291,10 +313,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       nightCompRef.current = nightComp;
       bassBoostFilterRef.current = bassBoost;
       vocalBoostFilterRef.current = vocalBoost;
+      stereoWidenSplitterRef.current = splitter;
+      stereoWidenMergerRef.current = merger;
+      midGainRef.current = midGain;
+      sideGainRef.current = sideGain;
+      analyserRef.current = analyser;
+      preGainRef.current = preGain;
+      postLimiterGainRef.current = postLimiterGain;
     } catch (e) { console.error('initAudioContext error:', e); }
   }
 
-  // ── Apply EQ gains to filters ───────────────────────────────
   function applyEQ() {
     const eq = sRef.current.equalizer;
     const gains = [eq.bass32, eq.bass64, eq.bass125, eq.lowMid250, eq.mid500,
@@ -303,7 +331,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const val = Math.max(-12, Math.min(12, gains[i]));
       eqRefs.current[i].gain.setTargetAtTime(val, ctxRef.current?.currentTime || 0, 0.02);
     }
-    // Apply mode presets
     if (eq.mode === 'headphone') {
       if (eqRefs.current[8] && gains[8] === 0) eqRefs.current[8].gain.setTargetAtTime(2, ctxRef.current?.currentTime || 0, 0.02);
     } else if (eq.mode === 'speaker') {
@@ -312,51 +339,61 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ── Apply sound effects through dedicated audio nodes ─────
   function applySoundEffects() {
     const sfx = sRef.current.soundEffects;
     const ctx = ctxRef.current;
     if (!ctx) return;
     const t = ctx.currentTime;
 
-    // Bass boost: dedicated low-shelf filter (additive to EQ)
     if (bassBoostFilterRef.current) {
       bassBoostFilterRef.current.gain.setTargetAtTime(sfx.bassBoost * 10, t, 0.02);
     }
 
-    // Vocal boost: dedicated presence filter at 3.2kHz
     if (vocalBoostFilterRef.current) {
       vocalBoostFilterRef.current.gain.setTargetAtTime(sfx.vocalBoost * 6, t, 0.02);
     }
 
-    // Reverb: wet/dry mix via convolver
     if (reverbGainRef.current && dryGainRef.current) {
       const wet = sfx.reverb;
       reverbGainRef.current.gain.setTargetAtTime(wet, t, 0.03);
       dryGainRef.current.gain.setTargetAtTime(1 - wet * 0.5, t, 0.03);
     }
 
-    // Spatial audio: handled by animation loop above
-    // Just reset pan if disabled
+    // Stereo width: adjust mid/side balance
+    if (midGainRef.current && sideGainRef.current) {
+      const width = sfx.stereoWidth ?? 0.5;
+      const midLevel = 1.0 - width * 0.3;
+      const sideLevel = width * 0.8;
+      midGainRef.current.gain.setTargetAtTime(midLevel, t, 0.05);
+      sideGainRef.current.gain.setTargetAtTime(sideLevel, t, 0.05);
+    }
+
     if (!sfx.spatialAudio && pannerRef.current) {
       pannerRef.current.pan.setTargetAtTime(0, t, 0.05);
     }
 
-    // Night mode: reduce volume + tighten dynamic range for quiet listening
+    // Night mode: compression + volume reduction for quiet listening
+    if (nightCompRef.current) {
+      if (sfx.nightMode) {
+        nightCompRef.current.threshold.setTargetAtTime(-18, t, 0.1);
+        nightCompRef.current.ratio.setTargetAtTime(8, t, 0.1);
+      } else {
+        nightCompRef.current.threshold.setTargetAtTime(-80, t, 0.1);
+        nightCompRef.current.ratio.setTargetAtTime(1, t, 0.1);
+      }
+    }
+
     if (masterGainRef.current) {
-      const nightVol = sfx.nightMode ? 0.5 : 1.0;
+      const nightVol = sfx.nightMode ? 0.55 : 1.0;
       masterGainRef.current.gain.setTargetAtTime(nightVol, t, 0.05);
     }
   }
 
-  // ── Acquire Wake Lock for background playback ───────────────
   async function requestWakeLock() {
     try {
       if ('wakeLock' in navigator) {
         wakeLockRef.current = await navigator.wakeLock.request('screen');
-        wakeLockRef.current?.addEventListener('release', () => {
-          wakeLockRef.current = null;
-        });
+        wakeLockRef.current?.addEventListener('release', () => { wakeLockRef.current = null; });
       }
     } catch {}
   }
@@ -366,100 +403,97 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     wakeLockRef.current = null;
   }
 
-  // ── Resume AudioContext if suspended ────────────────────────
   function ensureAudioContext() {
     if (ctxRef.current?.state === 'suspended') {
       ctxRef.current.resume().catch(() => {});
     }
   }
 
-  // ── Init YouTube player + audio element ──────────────────────
-  useEffect(() => {
-    const div = document.createElement('div');
-    div.id = 'yt-box';
-    div.style.display = 'none';
-    document.body.appendChild(div);
-    containerRef.current = div;
+  // ── Auto-gain: analyze loudness in first 3 seconds ──
+  function startAutoGainAnalysis() {
+    const analyser = analyserRef.current;
+    const ctx = ctxRef.current;
+    const preGain = preGainRef.current;
+    if (!analyser || !ctx || !preGain) return;
+    const bufLen = analyser.frequencyBinCount;
+    const data = new Float32Array(bufLen);
+    let sampleCount = 0;
+    let sumSquares = 0;
+    const duration = 3;
+    const sampleRate = 2;
+    const interval = setInterval(() => {
+      analyser.getFloatTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+      const rms = Math.sqrt(sum / data.length);
+      sumSquares += rms * rms;
+      sampleCount++;
+      if (sampleCount >= duration * sampleRate) {
+        clearInterval(interval);
+        const avgRms = Math.sqrt(sumSquares / sampleCount);
+        if (avgRms > 0.001) {
+          const currentLufs = 20 * Math.log10(avgRms) + 3;
+          setLoudnessDb(Math.round(currentLufs));
+          const targetLufs = -14;
+          const gainDb = targetLufs - currentLufs;
+          const gainLinear = Math.pow(10, gainDb / 20);
+          const clampedGain = Math.max(0.2, Math.min(3.0, gainLinear));
+          preGain.gain.setTargetAtTime(clampedGain, ctx.currentTime, 0.5);
+        }
+      }
+    }, 1000 / sampleRate);
+  }
 
+  // ── Spectrum visualizer loop ──
+  useEffect(() => {
+    let raf: number;
+    const update = () => {
+      const analyser = analyserRef.current;
+      if (analyser) {
+        const bufLen = analyser.frequencyBinCount;
+        const data = new Uint8Array(bufLen);
+        analyser.getByteFrequencyData(data);
+        const step = Math.floor(bufLen / 64);
+        const sampled = new Uint8Array(64);
+        for (let i = 0; i < 64; i++) sampled[i] = data[i * step] || 0;
+        setLiveSpectrum(sampled);
+      }
+      raf = requestAnimationFrame(update);
+    };
+    raf = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // ── Init audio element ──
+  useEffect(() => {
     const au = new Audio();
-    au.volume = state.volume;
+    au.volume = 1;
     au.crossOrigin = 'anonymous';
+    au.preload = 'auto';
     audioRef.current = au;
     initAudioContext(au);
 
-    // Handle visibility change to keep audio playing
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        ensureAudioContext();
-      }
+      if (document.visibilityState === 'visible') ensureAudioContext();
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
-
-    // Handle page blur/focus
-    const onBlur = () => { ensureAudioContext(); };
-    window.addEventListener('blur', onBlur);
-
-    loadYTAPI().then(() => {
-      if (!div || ytInitRef.current) return;
-      ytInitRef.current = true;
-      const YT = window.YT;
-      if (YT?.Player) {
-        try {
-          ytPlayerRef.current = new YT.Player(div, {
-            height: '0', width: '0',
-            playerVars: { autoplay: 0, controls: 0, disablekb: 1, enablejsapi: 1, fs: 0, modestbranding: 1, origin: window.location.origin },
-            events: {
-              onReady: () => {
-                playerReadyRef.current = true;
-                if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(state.volume * 100);
-                if (pendingPlayRef.current) {
-                  ytPlayerRef.current.loadVideoById(pendingPlayRef.current, 0, 'default');
-                  pendingPlayRef.current = null;
-                }
-              },
-              onStateChange: (e: any) => {
-                if (e.data === YT.PlayerState.PLAYING) {
-                  setState(s => ({ ...s, isPlaying: true, duration: ytPlayerRef.current?.getDuration?.() || s.duration }));
-                } else if (e.data === YT.PlayerState.PAUSED) {
-                  setState(s => ({ ...s, isPlaying: false }));
-                } else if (e.data === YT.PlayerState.ENDED) { onEnded(); }
-              },
-              onError: () => {
-                const t = sRef.current.currentTrack;
-                if (t?.youtubeId) {
-                  playViaStream(t.youtubeId);
-                } else {
-                  setAudioError('Playback unavailable');
-                  setState(s => ({ ...s, isPlaying: false }));
-                }
-              },
-            },
-          });
-        } catch { ytFailedRef.current = true; }
-      } else {
-        ytFailedRef.current = true;
-      }
-    });
+    window.addEventListener('blur', ensureAudioContext);
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      window.removeEventListener('blur', onBlur);
-      ytPlayerRef.current?.destroy();
-      div.remove();
+      window.removeEventListener('blur', ensureAudioContext);
       au.src = '';
       ctxRef.current?.close();
       releaseWakeLock();
     };
   }, []);
 
-  // ── Volume sync ──────────────────────────────────────────────
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
-    if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(volume * 100);
     setState(s => ({ ...s, volume }));
   }, [volume]);
 
-  // ── Spatial audio animation loop ────────────────────────────
+  // ── Spatial audio animation loop ──
   useEffect(() => {
     if (!sRef.current.soundEffects.spatialAudio) return;
     let raf: number;
@@ -475,29 +509,39 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => cancelAnimationFrame(raf);
   }, [state.soundEffects.spatialAudio]);
 
-  // ── Save state ───────────────────────────────────────────────
+  // ── Save state ──
   useEffect(() => {
     try {
       const eq = sRef.current.equalizer;
       const sfx = sRef.current.soundEffects;
       localStorage.setItem(LS_KEY, JSON.stringify({
         volume, shuffle: state.shuffle, repeat: state.repeat,
-        audioQuality: state.audioQuality,
+        audioQuality: state.audioQuality, crossfade: state.crossfade,
+        crossfadeDuration: state.crossfadeDuration,
         equalizer: { ...eq }, soundEffects: { ...sfx },
         recentlyPlayed: sRef.current.recentlyPlayed,
       }));
     } catch {}
-  }, [volume, state.shuffle, state.repeat, state.audioQuality, state.equalizer, state.soundEffects]);
+  }, [volume, state.shuffle, state.repeat, state.audioQuality, state.equalizer, state.soundEffects, state.crossfade, state.crossfadeDuration]);
 
-  // ── Progress tick ────────────────────────────────────────────
+  // ── Progress tick ──
   useEffect(() => {
     const iv = setInterval(() => {
       const s = sRef.current;
       if (!s.isPlaying || !s.currentTrack) return;
-      if (streamingRef.current || useAudioSource(s.currentTrack)) {
-        if (audioRef.current) setState(prev => ({ ...prev, progress: audioRef.current!.currentTime }));
-      } else {
-        try { if (ytPlayerRef.current?.getCurrentTime) setState(prev => ({ ...prev, progress: ytPlayerRef.current.getCurrentTime() })); } catch {}
+      const au = audioRef.current;
+      if (au && streamingRef.current) {
+        setState(prev => ({ ...prev, progress: au.currentTime }));
+        // Crossfade: start next track before current ends
+        if (s.crossfade && s.crossfadeDuration > 0 && s.queueIndex < s.queue.length - 1) {
+          const remaining = au.duration - au.currentTime;
+          if (remaining <= s.crossfadeDuration && remaining > 0 && !crossfadeTimerRef.current) {
+            crossfadeTimerRef.current = setTimeout(() => {
+              crossfadeTimerRef.current = null;
+              doNext();
+            }, remaining * 1000);
+          }
+        }
       }
     }, 250);
     return () => clearInterval(iv);
@@ -506,18 +550,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   function onEnded() {
     const s = sRef.current;
     if (s.repeat === 'one') {
-      if (streamingRef.current || useAudioSource(s.currentTrack)) {
-        if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
-      } else {
-        ytPlayerRef.current?.seekTo(0); ytPlayerRef.current?.playVideo();
-      }
-    } else if (s.repeat === 'all' || s.queueIndex < s.queue.length - 1) { doNext(); }
-    else setState(prev => ({ ...prev, isPlaying: false, progress: 0 }));
+      if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
+    } else if (s.repeat === 'all' || s.queueIndex < s.queue.length - 1) {
+      doNext();
+    } else {
+      setState(prev => ({ ...prev, isPlaying: false, progress: 0 }));
+    }
   }
 
   function doNext() {
     const s = sRef.current;
     if (!s.queue.length) return;
+    if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
     const idx = s.shuffle ? Math.floor(Math.random() * s.queue.length) : (s.queueIndex + 1) % s.queue.length;
     const t = s.queue[idx];
     if (t) doPlay(t, s.queue);
@@ -526,17 +570,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   function doPrev() {
     const s = sRef.current;
     if (!s.queue.length) return;
+    if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
     if (s.progress > 3) {
-      if (streamingRef.current || useAudioSource(s.currentTrack)) { if (audioRef.current) audioRef.current.currentTime = 0; }
-      else ytPlayerRef.current?.seekTo(0);
-      setState(s => ({ ...s, progress: 0 })); return;
+      if (audioRef.current) audioRef.current.currentTime = 0;
+      setState(s => ({ ...s, progress: 0 }));
+      return;
     }
     const idx = s.shuffle ? Math.floor(Math.random() * s.queue.length) : (s.queueIndex - 1 + s.queue.length) % s.queue.length;
     const t = s.queue[idx];
     if (t) doPlay(t, s.queue);
   }
 
-  // ── Media Session API for background playback ──────────────────
   function updateMediaSession(track: Track) {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const artwork = [
@@ -555,18 +599,47 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     navigator.mediaSession.setActionHandler('pause', () => pause());
     navigator.mediaSession.setActionHandler('previoustrack', () => prev());
     navigator.mediaSession.setActionHandler('nexttrack', () => next());
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details.seekTime != null) seek(details.seekTime);
-    });
+    navigator.mediaSession.setActionHandler('seekto', (details) => { if (details.seekTime != null) seek(details.seekTime); });
     navigator.mediaSession.setActionHandler('stop', () => pause());
+  }
+
+  // ── Crossfade: fade out current audio ──
+  function fadeOutCurrent(duration: number) {
+    const au = audioRef.current;
+    const ctx = ctxRef.current;
+    if (!au || !ctx) return;
+    const currentVol = sRef.current.volume;
+    au.volume = currentVol;
+    const steps = 20;
+    const stepTime = (duration * 1000) / steps;
+    let step = 0;
+    const fade = setInterval(() => {
+      step++;
+      if (step >= steps) {
+        clearInterval(fade);
+        au.volume = 0;
+        au.pause();
+        au.volume = currentVol;
+      } else {
+        au.volume = currentVol * (1 - step / steps);
+      }
+    }, stepTime);
   }
 
   async function doPlay(track: Track, q?: Track[]) {
     setAudioError(null);
     ensureAudioContext();
     requestWakeLock();
+    if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
     const queue = q || [track];
     const idx = q ? q.findIndex(t => t.id === track.id) : 0;
+
+    // Crossfade: fade out current before switching
+    const isCrossfading = sRef.current.crossfade && streamingRef.current && audioRef.current && audioRef.current.duration > 0;
+    if (isCrossfading) {
+      fadeOutCurrent(Math.min(sRef.current.crossfadeDuration, 2));
+    }
+
     setState(s => {
       const rp = s.recentlyPlayed.filter(t => t.id !== track.id);
       rp.unshift(track);
@@ -577,62 +650,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     applyEQ();
     applySoundEffects();
 
-    // If we have a YouTube ID, play via YouTube
+    // Always stream YouTube tracks through our audio chain
     if (track.youtubeId) {
-      streamingRef.current = false;
-      if (playerReadyRef.current && ytPlayerRef.current) {
-        try {
-          ytPlayerRef.current.loadVideoById(track.youtubeId, 0, 'hd720');
-          audioRef.current!.src = '';
-          if (state.audioQuality === 'high') {
-            ytPlayerRef.current.setPlaybackQuality('hd1080');
-          } else if (state.audioQuality === 'mid') {
-            ytPlayerRef.current.setPlaybackQuality('hd720');
-          } else {
-            ytPlayerRef.current.setPlaybackQuality('medium');
-          }
-          return;
-        } catch {}
-      }
-      if (ytFailedRef.current) {
-        playViaStream(track.youtubeId, queue, idx);
-        return;
-      }
-      pendingPlayRef.current = track.youtubeId;
+      playViaStream(track.youtubeId, queue, idx);
       return;
     }
 
-    // No YouTube ID — search YouTube
-    setAudioError(null);
+    // Search YouTube for tracks without YouTube ID
     try {
       const found = await findOnYouTube(track.title, track.artist.name);
       if (found) {
         track.youtubeId = found;
-        streamingRef.current = false;
-        if (playerReadyRef.current && ytPlayerRef.current) {
-          try {
-            ytPlayerRef.current.loadVideoById(found, 0, 'default');
-            audioRef.current!.src = '';
-            return;
-          } catch {}
-        }
-        if (ytFailedRef.current) {
-          playViaStream(found, queue, idx);
-          return;
-        }
-        pendingPlayRef.current = found;
+        playViaStream(found, queue, idx);
         return;
       }
     } catch {}
 
-    // Last resort: direct audio preview
+    // Fallback: direct audio preview (Audius/Deezer/etc.)
     if (track.preview && audioRef.current) {
-      ytPlayerRef.current?.stopVideo();
+      streamingRef.current = true;
       audioRef.current.src = track.preview;
-      audioRef.current.volume = volume;
+      audioRef.current.volume = sRef.current.volume;
       ensureAudioContext();
+      audioRef.current.onended = () => { streamingRef.current = false; onEnded(); };
       try {
         await audioRef.current.play();
+        startAutoGainAnalysis();
         return;
       } catch {}
     }
@@ -644,7 +687,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   async function playViaStream(youtubeId: string, queue?: Track[], idx?: number) {
     streamingRef.current = false;
     try {
-      ytPlayerRef.current?.stopVideo();
       const res = await fetch(`/api/stream?id=${youtubeId}`);
       const data = await res.json();
       if (!data.url) throw new Error('No stream URL');
@@ -662,6 +704,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         ensureAudioContext();
         au.onended = () => { streamingRef.current = false; onEnded(); };
         await au.play();
+        startAutoGainAnalysis();
       }
     } catch {
       setAudioError('Stream unavailable');
@@ -671,18 +714,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const play = useCallback((track: Track, queue?: Track[]) => doPlay(track, queue), []);
   const pause = useCallback(() => {
-    const s = sRef.current;
-    if (streamingRef.current || useAudioSource(s.currentTrack)) audioRef.current?.pause();
-    else ytPlayerRef.current?.pauseVideo();
+    audioRef.current?.pause();
     setState(s => ({ ...s, isPlaying: false }));
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   }, []);
   const resume = useCallback(() => {
-    const s = sRef.current;
     ensureAudioContext();
-    if (streamingRef.current || useAudioSource(s.currentTrack)) {
-      audioRef.current?.play().catch(() => {});
-    } else ytPlayerRef.current?.playVideo();
+    audioRef.current?.play().catch(() => {});
     setState(s => ({ ...s, isPlaying: true }));
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
   }, []);
@@ -690,9 +728,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const prev = useCallback(() => doPrev(), []);
   const setVolume = useCallback((v: number) => setVolumeState(Math.max(0, Math.min(1, v))), []);
   const seek = useCallback((t: number) => {
-    const s = sRef.current;
-    if (streamingRef.current || useAudioSource(s.currentTrack)) { if (audioRef.current) audioRef.current.currentTime = t; }
-    else ytPlayerRef.current?.seekTo(t);
+    if (audioRef.current) audioRef.current.currentTime = t;
     setState(s => ({ ...s, progress: t }));
   }, []);
 
@@ -709,7 +745,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }), []);
   const clearQueue = useCallback(() => setState(s => ({ ...s, queue: [], queueIndex: -1 })), []);
 
-  // ── Download ──────────────────────────────────────────────────
   const downloadCurrentTrack = useCallback(async () => {
     const t = sRef.current.currentTrack;
     if (!t) return;
@@ -723,13 +758,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setDownloading(false);
   }, []);
 
-  // ── Quality & Effects ─────────────────────────────────────────
   const setAudioQuality = useCallback((q: string) => {
     setState(s => ({ ...s, audioQuality: q as any }));
-    if (ytPlayerRef.current?.setPlaybackQuality) {
-      const map: Record<string, string> = { low: 'small', mid: 'medium', high: 'hd720' };
-      ytPlayerRef.current.setPlaybackQuality(map[q] || 'medium');
-    }
   }, []);
 
   const setEqualizer = useCallback((bandOrMode: string, val: number) => {
@@ -756,15 +786,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setTimeout(applySoundEffects, 50);
   }, []);
 
+  const toggleCrossfade = useCallback(() => setState(s => ({ ...s, crossfade: !s.crossfade })), []);
+  const setCrossfadeDuration = useCallback((d: number) => setState(s => ({ ...s, crossfadeDuration: d })), []);
+
   return (
     <PlayerContext.Provider value={{
-      ...state, audioError, downloading,
+      ...state, audioError, downloading, liveSpectrum, loudnessDb,
       play, pause, resume, next, prev, setVolume, seek,
       toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue,
       downloadCurrentTrack, setAudioQuality, setEqualizer, setSoundEffect,
+      toggleCrossfade, setCrossfadeDuration,
       audioContext: ctxRef.current,
       eqFilters: eqRefs.current,
       masterGain: masterGainRef.current,
+      analyserNode: analyserRef.current,
     } as PlayerContextType}>
       {children}
     </PlayerContext.Provider>

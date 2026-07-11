@@ -11,12 +11,11 @@ export async function GET(request: Request) {
 
   try {
     const streamUrl = execSync(
-      `yt-dlp -f bestaudio --get-url "https://www.youtube.com/watch?v=${id}"`,
+      `yt-dlp -f "bestaudio[acodec=opus]/bestaudio[acodec=m4a]/bestaudio" --get-url "https://www.youtube.com/watch?v=${id}"`,
       { timeout: 15000, encoding: 'utf-8' },
     ).trim();
     if (streamUrl?.startsWith('http')) return NextResponse.json({ url: streamUrl });
   } catch {}
 
-  // Fallback: return the YouTube watch page URL so the client can redirect
   return NextResponse.json({ url: `https://www.youtube.com/watch?v=${id}`, fallback: true });
 }

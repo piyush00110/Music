@@ -133,6 +133,8 @@ export default function PlayerPage() {
     shuffle, repeat, soundEffects, equalizer,
     setSoundEffect, setEqualizer, setAudioQuality,
     downloadCurrentTrack, downloading, audioError,
+    liveSpectrum, loudnessDb, crossfade, crossfadeDuration,
+    toggleCrossfade, setCrossfadeDuration,
   } = usePlayer();
   const [showQueue, setShowQueue] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -352,12 +354,21 @@ export default function PlayerPage() {
           </div>
         </div>
 
-        {/* Spectrum */}
+        {/* Spectrum - Real-time frequency data */}
         <div className="flex items-end justify-center gap-[2px] h-8 mb-2 pointer-events-none">
-          {Array.from({ length: 32 }).map((_, i) => (
-            <div key={i} className="w-[2px] rounded-full origin-bottom"
-              style={{ backgroundColor: i < 10 ? dominantColor : i < 22 ? `${dominantColor}80` : `${dominantColor}40`, height: isPlaying ? '100%' : `${15 + (i % 4) * 8}%`, animation: isPlaying ? `spectrum-bar ${0.4 + (i % 5) * 0.15}s ease-in-out infinite ${i * 0.05}s` : `breathe-ring ${2 + (i % 3)}s ease-in-out infinite ${i * 0.1}s`, opacity: isPlaying ? 0.6 : 0.2, transition: 'height 0.5s ease, opacity 0.3s' }} />
-          ))}
+          {(liveSpectrum.length > 0 ? Array.from(liveSpectrum) : Array.from({ length: 64 }, () => 0)).slice(0, 32).map((val, i) => {
+            const height = isPlaying ? (val / 255) * 100 : 15 + (i % 4) * 8;
+            const opacity = isPlaying ? 0.6 + val / 255 * 0.4 : 0.2;
+            return (
+              <div key={i} className="w-[2px] rounded-full origin-bottom transition-all"
+                style={{
+                  height: `${Math.max(3, height)}%`,
+                  backgroundColor: i < 10 ? dominantColor : i < 22 ? `${dominantColor}80` : `${dominantColor}40`,
+                  opacity,
+                  transition: isPlaying ? 'height 0.08s ease-out' : 'height 0.3s ease',
+                }} />
+            );
+          })}
         </div>
 
         {/* Track Info */}
@@ -538,6 +549,43 @@ export default function PlayerPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Stereo Width */}
+              <div className="p-4 rounded-2xl glass-card">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-lg" style={{ color: dominantColor }}>swap_horiz</span>
+                    <span className="text-[12px] text-white font-medium">Stereo Width</span>
+                  </div>
+                  <span className="text-[10px] font-mono" style={{ color: dominantColor }}>{Math.round((soundEffects.stereoWidth ?? 0.5) * 100)}%</span>
+                </div>
+                <DragSlider value={soundEffects.stereoWidth ?? 0.5} onChange={(v) => setSoundEffect('stereoWidth', v)} min={0} max={1} color={dominantColor} />
+              </div>
+
+              {/* Crossfade */}
+              <div className="p-4 rounded-2xl glass-card">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-lg" style={{ color: dominantColor }}>blur_on</span>
+                    <span className="text-[12px] text-white font-medium">Crossfade</span>
+                  </div>
+                  <button onClick={toggleCrossfade}
+                    className="w-10 h-6 rounded-full relative flex items-center px-1 border transition-all duration-300"
+                    style={{ backgroundColor: crossfade ? dominantColor : 'rgba(255,255,255,0.1)', borderColor: crossfade ? dominantColor : 'rgba(255,255,255,0.1)' }}>
+                    <div className="w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300"
+                      style={{ marginLeft: crossfade ? 'auto' : '0' }} />
+                  </button>
+                </div>
+                {crossfade && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[9px] text-zinc-500">Duration</span>
+                      <span className="text-[10px] font-mono" style={{ color: dominantColor }}>{crossfadeDuration}s</span>
+                    </div>
+                    <DragSlider value={crossfadeDuration} onChange={setCrossfadeDuration} min={1} max={12} color={dominantColor} />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 10-Band Equalizer - FULLY INTERACTIVE */}
@@ -598,9 +646,27 @@ export default function PlayerPage() {
             </div>
 
             {/* Status */}
-            <div className="flex items-center justify-center gap-3 text-zinc-600 pt-4 border-t border-white/[0.04]">
-              <span className="material-symbols-outlined text-[18px]">headphones</span>
-              <span className="text-[9px] uppercase tracking-[0.3em] font-medium">Aurelia HiFi 48kHz • Active</span>
+            <div className="space-y-3 pt-4 border-t border-white/[0.04]">
+              <div className="flex items-center justify-center gap-3 text-zinc-600">
+                <span className="material-symbols-outlined text-[18px]">headphones</span>
+                <span className="text-[9px] uppercase tracking-[0.3em] font-medium">Aurelia HiFi 48kHz • Active</span>
+              </div>
+              {isPlaying && (
+                <div className="flex items-center justify-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-zinc-600 uppercase tracking-wider">Loudness</span>
+                    <span className="text-[11px] font-mono font-bold" style={{ color: loudnessDb > -8 ? '#ef4444' : loudnessDb > -18 ? dominantColor : '#3b82f6' }}>
+                      {loudnessDb} LUFS
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-zinc-600 uppercase tracking-wider">Source</span>
+                    <span className="text-[11px] font-mono font-bold" style={{ color: '#10b981' }}>
+                      Opus
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

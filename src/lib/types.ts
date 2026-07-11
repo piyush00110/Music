@@ -33,6 +33,7 @@ export interface PlayerState {
     mid1k: number; mid2k: number; high4k: number; high8k: number; high16k: number;
     preset: string; mode: 'normal' | 'headphone' | 'speaker';
   };
-  soundEffects: { reverb: number; bassBoost: number; surround3D: number; vocalBoost: number; nightMode: boolean; spatialAudio?: boolean; masterQuality?: boolean };
+  soundEffects: { reverb: number; bassBoost: number; surround3D: number; vocalBoost: number; nightMode: boolean; spatialAudio?: boolean; masterQuality?: boolean; stereoWidth?: number; crossfadeDuration?: number };
   recentlyPlayed: Track[];
+  crossfadeDuration: number;
 }
