@@ -275,9 +275,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       normalizer.release.value = 0.25;
 
       const nightComp = ctx.createDynamicsCompressor();
-      nightComp.threshold.value = -20;
-      nightComp.knee.value = 12;
-      nightComp.ratio.value = 6;
+      nightComp.threshold.value = -80;
+      nightComp.knee.value = 0;
+      nightComp.ratio.value = 1;
       nightComp.attack.value = 0.01;
       nightComp.release.value = 0.3;
 
@@ -323,11 +323,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       reverbGain.connect(mg);
       dryGain.connect(mg);
 
-      // masterGain → exciter → preGain → normalizer → limiter → analyser → destination
+      // masterGain → exciter → preGain → normalizer → nightComp → limiter → analyser → destination
       mg.connect(exciter);
       exciter.connect(preGain);
       preGain.connect(normalizer);
-      normalizer.connect(limiter);
+      normalizer.connect(nightComp);
+      nightComp.connect(limiter);
       limiter.connect(analyser);
       analyser.connect(ctx.destination);
 
