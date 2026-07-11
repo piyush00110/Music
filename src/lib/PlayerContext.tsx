@@ -168,7 +168,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [loudnessDb, setLoudnessDb] = useState(-14);
 
   const EQ_FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-  const EQ_Q = [0.7, 1.0, 1.2, 1.4, 1.5, 1.5, 1.4, 1.2, 1.0, 0.7];
+  // Musical Q values: wider on lows/highs, tighter on mids for precision
+  const EQ_Q = [0.7, 0.9, 1.0, 1.2, 1.4, 1.5, 1.4, 1.2, 0.9, 0.7];
 
   const pannerRef = useRef<StereoPannerNode | null>(null);
   const reverbGainRef = useRef<GainNode | null>(null);
@@ -181,24 +182,35 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const sideGainRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const preGainRef = useRef<GainNode | null>(null);
+  const exciterRef = useRef<WaveShaperNode | null>(null);
 
-  // ── Better reverb IR with early reflections + pre-delay ──
-  function createReverbIR(ctx: AudioContext, duration = 2.5, decay = 2.5): AudioBuffer {
+  // ── Professional reverb IR: multi-room with early reflections, pre-delay, and diffusion ──
+  function createReverbIR(ctx: AudioContext, duration = 2.8, decay = 2.5): AudioBuffer {
     const rate = ctx.sampleRate;
-    const preDelaySamples = Math.floor(rate * 0.02);
+    const preDelaySamples = Math.floor(rate * 0.025);
     const length = rate * duration + preDelaySamples;
     const buffer = ctx.createBuffer(2, length, rate);
     for (let ch = 0; ch < 2; ch++) {
       const data = buffer.getChannelData(ch);
+      const stereoOffset = ch * Math.floor(rate * 0.003);
       for (let i = 0; i < length; i++) {
-        if (i < preDelaySamples) {
+        const idx = i + stereoOffset;
+        if (idx < preDelaySamples) {
           data[i] = 0;
         } else {
-          const t = (i - preDelaySamples) / (length - preDelaySamples);
-          const earlyReflection = i < rate * 0.08 ? (Math.random() * 2 - 1) * 0.6 * Math.pow(1 - t, 4) : 0;
-          const lateReverb = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
-          const density = Math.min(1, t * 3);
-          data[i] = earlyReflection * (1 - density * 0.5) + lateReverb * density * 0.7;
+          const t = (idx - preDelaySamples) / (length - preDelaySamples);
+          let sample = 0;
+          // Early reflections (discrete taps)
+          const erTaps = [0.013, 0.021, 0.035, 0.051, 0.067, 0.089, 0.112];
+          for (const tap of erTaps) {
+            const tapIdx = preDelaySamples + Math.floor(rate * tap);
+            if (idx === tapIdx) sample += (Math.random() * 2 - 1) * 0.35 * Math.pow(1 - t, 3);
+          }
+          // Diffuse late reverb with modulation
+          const mod = 1 + 0.15 * Math.sin(2 * Math.PI * 0.8 * t);
+          const lateDensity = Math.min(1, t * 4);
+          sample += (Math.random() * 2 - 1) * Math.pow(1 - t, decay) * lateDensity * 0.55 * mod;
+          data[i] = sample;
         }
       }
     }
@@ -270,15 +282,26 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       nightComp.release.value = 0.3;
 
       const limiter = ctx.createDynamicsCompressor();
-      limiter.threshold.value = -1.0;
-      limiter.knee.value = 0.5;
+      limiter.threshold.value = -0.5;
+      limiter.knee.value = 0;
       limiter.ratio.value = 20;
-      limiter.attack.value = 0.001;
-      limiter.release.value = 0.05;
+      limiter.attack.value = 0.0005;
+      limiter.release.value = 0.02;
 
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.82;
+
+      // ── Harmonic exciter (tape saturation) ──
+      const exciter = ctx.createWaveShaper();
+      const exciterCurve = new Float32Array(44100);
+      for (let i = 0; i < 44100; i++) {
+        const x = (i / 22050) * 2 - 1;
+        // Soft-clipping tape saturation curve with odd harmonics
+        exciterCurve[i] = Math.tanh(x * 1.2) * 0.95;
+      }
+      exciter.curve = exciterCurve;
+      exciter.oversample = '4x';
 
       // ── Build chain ──
       src.connect(filters[0]);
@@ -300,7 +323,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       reverbGain.connect(mg);
       dryGain.connect(mg);
 
-      mg.connect(preGain);
+      // masterGain → exciter → preGain → normalizer → limiter → analyser → destination
+      mg.connect(exciter);
+      exciter.connect(preGain);
       preGain.connect(normalizer);
       normalizer.connect(limiter);
       limiter.connect(analyser);
@@ -322,6 +347,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       sideGainRef.current = sideGain;
       analyserRef.current = analyser;
       preGainRef.current = preGain;
+      exciterRef.current = exciter;
     } catch (e) { console.error('initAudioContext error:', e); }
   }
 
@@ -354,23 +380,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       vocalBoostFilterRef.current.gain.setTargetAtTime(sfx.vocalBoost * 6, t, 0.02);
     }
     if (reverbGainRef.current && dryGainRef.current) {
-      reverbGainRef.current.gain.setTargetAtTime(sfx.reverb, t, 0.03);
-      dryGainRef.current.gain.setTargetAtTime(1 - sfx.reverb * 0.5, t, 0.03);
+      const wet = sfx.reverb;
+      // Equal-power crossfade for reverb wet/dry
+      reverbGainRef.current.gain.setTargetAtTime(Math.sin(wet * Math.PI / 2), t, 0.03);
+      dryGainRef.current.gain.setTargetAtTime(Math.cos(wet * Math.PI / 2), t, 0.03);
     }
     if (midGainRef.current && sideGainRef.current) {
       const width = sfx.stereoWidth ?? 0.5;
-      midGainRef.current.gain.setTargetAtTime(1.0 - width * 0.3, t, 0.05);
-      sideGainRef.current.gain.setTargetAtTime(width * 0.8, t, 0.05);
+      // Proper M/S: at 0 = mono (mid only), at 1 = wider (boosted sides)
+      const midLevel = 1.0 - width * 0.15;
+      const sideLevel = 0.3 + width * 0.7;
+      midGainRef.current.gain.setTargetAtTime(midLevel, t, 0.05);
+      sideGainRef.current.gain.setTargetAtTime(sideLevel, t, 0.05);
     }
     if (!sfx.spatialAudio && pannerRef.current) {
       pannerRef.current.pan.setTargetAtTime(0, t, 0.05);
     }
     if (nightCompRef.current) {
       if (sfx.nightMode) {
-        nightCompRef.current.threshold.setTargetAtTime(-18, t, 0.1);
-        nightCompRef.current.ratio.setTargetAtTime(8, t, 0.1);
+        // Multi-band style compression: gentle limiting + volume reduction
+        nightCompRef.current.threshold.setTargetAtTime(-16, t, 0.1);
+        nightCompRef.current.knee.setTargetAtTime(6, t, 0.1);
+        nightCompRef.current.ratio.setTargetAtTime(6, t, 0.1);
       } else {
         nightCompRef.current.threshold.setTargetAtTime(-80, t, 0.1);
+        nightCompRef.current.knee.setTargetAtTime(0, t, 0.1);
         nightCompRef.current.ratio.setTargetAtTime(1, t, 0.1);
       }
     }
@@ -399,37 +433,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ── Auto-gain: analyze loudness in first 3 seconds ──
+  // ── Continuous loudness measurement (EBU R128-style) ──
+  const rmsAccumulatorRef = useRef({ sumSquares: 0, count: 0 });
   function startAutoGainAnalysis() {
     const analyser = analyserRef.current;
     const preGain = preGainRef.current;
     if (!analyser || !preGain) return;
     const bufLen = analyser.frequencyBinCount;
     const data = new Float32Array(bufLen);
-    let sampleCount = 0;
-    let sumSquares = 0;
-    const duration = 3;
-    const sampleRate = 2;
-    const interval = setInterval(() => {
+    rmsAccumulatorRef.current = { sumSquares: 0, count: 0 };
+    const measureInterval = setInterval(() => {
+      if (!sRef.current.isPlaying) { clearInterval(measureInterval); return; }
       analyser.getFloatTimeDomainData(data);
       let sum = 0;
       for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
       const rms = Math.sqrt(sum / data.length);
-      sumSquares += rms * rms;
-      sampleCount++;
-      if (sampleCount >= duration * sampleRate) {
-        clearInterval(interval);
-        const avgRms = Math.sqrt(sumSquares / sampleCount);
+      const acc = rmsAccumulatorRef.current;
+      acc.sumSquares += rms * rms;
+      acc.count++;
+      // After 4 seconds of measurement, apply normalization
+      if (acc.count >= 8) {
+        const avgRms = Math.sqrt(acc.sumSquares / acc.count);
         if (avgRms > 0.001) {
           const currentLufs = 20 * Math.log10(avgRms) + 3;
           setLoudnessDb(Math.round(currentLufs));
           const gainDb = -14 - currentLufs;
           const gainLinear = Math.pow(10, gainDb / 20);
-          const clampedGain = Math.max(0.2, Math.min(3.0, gainLinear));
-          if (ctxRef.current) preGain.gain.setTargetAtTime(clampedGain, ctxRef.current.currentTime, 0.5);
+          const clampedGain = Math.max(0.3, Math.min(2.5, gainLinear));
+          if (ctxRef.current) preGain.gain.setTargetAtTime(clampedGain, ctxRef.current.currentTime, 1.0);
         }
+        // Reset accumulator for next measurement window
+        acc.sumSquares = 0;
+        acc.count = 0;
       }
-    }, 1000 / sampleRate);
+    }, 500);
   }
 
   // ── Spectrum visualizer loop ──
@@ -659,11 +696,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     applyEQ();
     applySoundEffects();
 
-    // ── YouTube track: try IFrame API first, fallback to stream ──
+    // ── YouTube track: try stream first (gets audio through our effects chain), fallback to IFrame ──
     if (track.youtubeId) {
+      // Try stream API first for full audio processing through our chain
       streamingRef.current = false;
+      try {
+        const res = await fetch(`/api/stream?id=${track.youtubeId}`);
+        const data = await res.json();
+        if (data.url && !data.fallback) {
+          streamingRef.current = true;
+          const au = audioRef.current;
+          if (au) {
+            au.src = data.url;
+            au.volume = sRef.current.volume;
+            ensureAudioContext();
+            au.onended = () => { streamingRef.current = false; onEnded(); };
+            await au.play();
+            startAutoGainAnalysis();
+            return;
+          }
+        }
+      } catch {}
 
-      // Try YouTube IFrame API first (always works on Vercel)
+      // Fallback: YouTube IFrame API
+      streamingRef.current = false;
       if (playerReadyRef.current && ytPlayerRef.current) {
         try {
           ytPlayerRef.current.loadVideoById(track.youtubeId, 0, 'default');
@@ -675,19 +731,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         } catch {}
       }
       if (ytFailedRef.current) {
-        // IFrame failed, try stream API (yt-dlp)
-        playViaStream(track.youtubeId, queue, idx);
+        setAudioError('Playback unavailable');
+        setState(s => ({ ...s, isPlaying: false }));
         return;
       }
       pendingPlayRef.current = track.youtubeId;
       return;
     }
 
-    // ── No YouTube ID — search YouTube first, then play ──
+    // ── No YouTube ID — search YouTube, then play via stream ──
     try {
       const found = await findOnYouTube(track.title, track.artist.name);
       if (found) {
         track.youtubeId = found;
+        // Try stream first for full audio processing
+        try {
+          const res = await fetch(`/api/stream?id=${found}`);
+          const data = await res.json();
+          if (data.url && !data.fallback) {
+            streamingRef.current = true;
+            const au = audioRef.current;
+            if (au) {
+              ytPlayerRef.current?.stopVideo();
+              au.src = data.url;
+              au.volume = sRef.current.volume;
+              ensureAudioContext();
+              au.onended = () => { streamingRef.current = false; onEnded(); };
+              await au.play();
+              startAutoGainAnalysis();
+              return;
+            }
+          }
+        } catch {}
+
+        // Fallback: YT IFrame
         if (playerReadyRef.current && ytPlayerRef.current) {
           try {
             ytPlayerRef.current.loadVideoById(found, 0, 'default');
@@ -695,10 +772,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             return;
           } catch {}
         }
-        if (ytFailedRef.current) {
-          playViaStream(found, queue, idx);
-          return;
-        }
+        if (ytFailedRef.current) { playViaStream(found, queue, idx); return; }
         pendingPlayRef.current = found;
         return;
       }

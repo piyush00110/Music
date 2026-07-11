@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
   try {
     const streamUrl = execSync(
-      `yt-dlp -f "bestaudio[acodec=opus]/bestaudio[acodec=m4a]/bestaudio" --get-url "https://www.youtube.com/watch?v=${id}"`,
+      `yt-dlp -f "bestaudio[acodec=opus][abr>=256]/bestaudio[acodec=opus]/bestaudio[acodec=m4a]/bestaudio" --get-url "https://www.youtube.com/watch?v=${id}"`,
       { timeout: 15000, encoding: 'utf-8' },
     ).trim();
     if (streamUrl?.startsWith('http')) return NextResponse.json({ url: streamUrl });
