@@ -60,8 +60,13 @@ export async function searchMusic(query: string): Promise<Track[]> {
     const all: Track[] = [];
     for (const v of (data.items || [])) {
       const track = trackFromItem(v, all.length + 1);
-      const key = (track.title + track.artist.name).toLowerCase().replace(/\s+/g, '');
+      // Better dedup: normalize title and artist for comparison
+      const normalTitle = track.title.toLowerCase().replace(/[\s\-_.,!?'"()[\]{}:;/\\|@#$%^&*+=~`]/g, '').replace(/official.*|video.*|audio.*|lyric.*|hd.*|4k.*/gi, '');
+      const normalArtist = track.artist.name.toLowerCase().replace(/[\s\-_.,!?'"()[\]{}:;/\\|@#$%^&*+=~`]/g, '');
+      const key = `${normalTitle}|||${normalArtist}`;
       if (seen.has(key)) continue;
+      // Also skip if title is very different length (likely wrong match)
+      if (normalTitle.length < 3) continue;
       seen.add(key);
       all.push(track);
     }
@@ -135,8 +140,26 @@ export async function getRecommendations(recentlyPlayed: Track[]): Promise<Track
 
 // ─── YouTube search for non-YouTube tracks ───────────────────────
 export async function findOnYouTube(title: string, artist: string): Promise<string | null> {
-  const tracks = await searchMusic(`${artist} - ${title}`);
-  return tracks.find(t => t.source === 'youtube')?.youtubeId || null;
+  // Try multiple search strategies for best match
+  const cleanTitle = title.replace(/\(.*?\)|\[.*?\]| Official.*| HD.*| 4K.*/gi, '').trim();
+  const cleanArtist = artist.replace(/Official.*|Topic|VEVO/gi, '').trim();
+  
+  // Strategy 1: "artist - title" (most accurate for music)
+  const tracks1 = await searchMusic(`${cleanArtist} - ${cleanTitle}`);
+  const match1 = tracks1.find(t => t.source === 'youtube' && t.youtubeId);
+  if (match1?.youtubeId) return match1.youtubeId;
+
+  // Strategy 2: Just the title (if artist search fails)
+  const tracks2 = await searchMusic(cleanTitle);
+  const match2 = tracks2.find(t => t.source === 'youtube' && t.youtubeId);
+  if (match2?.youtubeId) return match2.youtubeId;
+
+  // Strategy 3: "title official audio"
+  const tracks3 = await searchMusic(`${cleanTitle} official audio`);
+  const match3 = tracks3.find(t => t.source === 'youtube' && t.youtubeId);
+  if (match3?.youtubeId) return match3.youtubeId;
+
+  return null;
 }
 
 export const GENRES = [

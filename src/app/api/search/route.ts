@@ -156,9 +156,14 @@ export async function GET(request: Request) {
     });
   }
 
-  // YouTube (2 strategies)
+  // YouTube (2 strategies) - add "official" for better music matching
   let yt = await searchYT(query).catch(() => null);
   if (!yt?.length) yt = await searchHTML(query).catch(() => null);
+  // If few results, try with "official audio" suffix
+  if (!yt || yt.length < 3) {
+    const yt2 = await searchYT(`${query} official audio`).catch(() => null);
+    if (yt2?.length) yt = [...(yt || []), ...yt2];
+  }
 
   // Audius + Deezer (parallel)
   const [au, dz] = await Promise.all([
@@ -168,19 +173,21 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     items: [
+      // Deezer + Audius first (accurate metadata, correct songs)
+      ...dz,
+      ...au,
+      // YouTube last (titles can be misleading)
       ...(yt || []).map((v: any, i: number) => ({
-        id: i + 1,
+        id: (dz.length + au.length) + i + 1,
         title: v.title,
         artistName: v.channel,
-        artistId: i + 1,
+        artistId: (dz.length + au.length) + i + 1,
         duration: v.duration,
         cover: v.thumbnail,
         stream: v.videoId,
         youtubeId: v.videoId,
         source: 'youtube' as const,
       })),
-      ...au,
-      ...dz,
     ],
   });
 }

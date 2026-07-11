@@ -22,6 +22,8 @@ function SearchContent() {
   const [loading, setLoading] = useState(!sc.results.length && !initialQ);
   const [error, setError] = useState('');
   const [recs, setRecs] = useState<Track[]>([]);
+  const [artistTopSongs, setArtistTopSongs] = useState<Track[]>([]);
+  const [artistName, setArtistName] = useState('');
   const { isPlaying, recentlyPlayed } = usePlayer();
   const restored = useRef(false);
 
@@ -59,12 +61,32 @@ function SearchContent() {
     if (!q.trim()) return;
     setLoading(true);
     setError('');
+    setArtistTopSongs([]);
+    setArtistName('');
     try {
       const tracks = await searchMusic(q);
       setResults(tracks);
       sc.setResults(tracks);
       sc.setQuery(q);
       if (tracks.length === 0) setError('No results found. Try a different search.');
+
+      // Detect top artist from results and fetch their top songs
+      if (tracks.length >= 3) {
+        const artistCounts: Record<string, number> = {};
+        tracks.forEach(t => {
+          const name = t.artist.name;
+          if (name && name !== 'Unknown') {
+            artistCounts[name] = (artistCounts[name] || 0) + 1;
+          }
+        });
+        const topArtist = Object.entries(artistCounts).sort((a, b) => b[1] - a[1])[0];
+        if (topArtist && topArtist[1] >= 2) {
+          setArtistName(topArtist[0]);
+          const topSongs = await searchMusic(`${topArtist[0]} official`);
+          const filtered = topSongs.filter(t => t.artist.name === topArtist[0] && !tracks.some(r => r.id === t.id));
+          setArtistTopSongs(filtered.slice(0, 5));
+        }
+      }
     } catch {
       setError('Search failed. Check your connection.');
     } finally {
@@ -195,6 +217,22 @@ function SearchContent() {
             </h2>
             <span className="text-[10px] text-zinc-600">{results.length} tracks</span>
           </div>
+
+          {/* Artist top songs suggestion */}
+          {artistTopSongs.length > 0 && (
+            <div className="mb-6 p-4 rounded-2xl bg-white/[0.03] border border-[#D4AF37]/15">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="material-symbols-outlined text-[#D4AF37] text-lg">person</span>
+                <h3 className="text-sm font-bold text-white">More by <span className="text-[#D4AF37]">{artistName}</span></h3>
+              </div>
+              <div className="space-y-0.5">
+                {artistTopSongs.map((track, i) => (
+                  <SongCard key={`artist-${track.id}`} track={track} index={i} queue={artistTopSongs} showIndex={false} />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-0.5 fade-in">
             {results.map((track, i) => (
               <SongCard key={`${track.source || 'yt'}-${track.id}`} track={track} index={i} queue={results} showIndex />

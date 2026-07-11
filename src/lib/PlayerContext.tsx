@@ -745,6 +745,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     ensureAudioContext();
     requestWakeLock();
     if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
+
+    // ── STOP old playback FIRST to prevent "plays old song" bug ──
+    if (streamingRef.current) {
+      const au = audioRef.current;
+      if (au) { au.pause(); au.src = ''; au.onended = null; }
+      streamingRef.current = false;
+    }
+    if (ytPlayerRef.current) {
+      try { ytPlayerRef.current.stopVideo(); } catch {}
+    }
+    pendingPlayRef.current = null;
+
     const queue = q || [track];
     const idx = q ? q.findIndex(t => t.id === track.id) : 0;
 
@@ -784,6 +796,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       streamingRef.current = false;
       if (playerReadyRef.current && ytPlayerRef.current) {
         try {
+          ytPlayerRef.current.stopVideo();
           ytPlayerRef.current.loadVideoById(track.youtubeId, 0, 'default');
           audioRef.current!.src = '';
           if (state.audioQuality === 'high') ytPlayerRef.current.setPlaybackQuality('hd1080');
@@ -801,7 +814,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // ── No YouTube ID — search YouTube, then play via stream ──
+    // ── No YouTube ID — try preview first (Deezer/Audius), then YouTube search ──
+
+    // Priority 1: If track has a preview URL, play it directly (accurate match)
+    if (track.preview && audioRef.current) {
+      streamingRef.current = true;
+      const au = audioRef.current;
+      au.src = track.preview;
+      au.volume = sRef.current.volume;
+      ensureAudioContext();
+      au.onended = () => { streamingRef.current = false; onEnded(); };
+      try {
+        await au.play();
+        startAutoGainAnalysis();
+        return;
+      } catch {}
+    }
+
+    // Priority 2: Search YouTube for a matching video
     try {
       const found = await findOnYouTube(track.title, track.artist.name);
       if (found) {
@@ -814,7 +844,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             streamingRef.current = true;
             const au = audioRef.current;
             if (au) {
-              ytPlayerRef.current?.stopVideo();
               au.src = data.url;
               au.volume = sRef.current.volume;
               ensureAudioContext();
@@ -829,6 +858,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         // Fallback: YT IFrame
         if (playerReadyRef.current && ytPlayerRef.current) {
           try {
+            ytPlayerRef.current.stopVideo();
             ytPlayerRef.current.loadVideoById(found, 0, 'default');
             audioRef.current!.src = '';
             return;
@@ -839,21 +869,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return;
       }
     } catch {}
-
-    // ── Last resort: direct audio preview (Audius/Deezer) ──
-    if (track.preview && audioRef.current) {
-      ytPlayerRef.current?.stopVideo();
-      streamingRef.current = true;
-      audioRef.current.src = track.preview;
-      audioRef.current.volume = sRef.current.volume;
-      ensureAudioContext();
-      audioRef.current.onended = () => { streamingRef.current = false; onEnded(); };
-      try {
-        await audioRef.current.play();
-        startAutoGainAnalysis();
-        return;
-      } catch {}
-    }
 
     setAudioError('Not available');
     setState(s => ({ ...s, isPlaying: false }));
