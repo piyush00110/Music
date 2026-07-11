@@ -265,6 +265,98 @@ body {
   opacity: 1;
 }
 
+/* === CARD HOVER EFFECTS === */
+.card-hover {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+.card-hover:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+}
+.card-hover:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* === HORIZONTAL SCROLL SMOOTH === */
+.scroll-smooth-x {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+.scroll-smooth-x > * {
+  scroll-snap-align: start;
+}
+
+/* === ARTIST CIRCLE HOVER === */
+.artist-circle {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+}
+.artist-circle:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 30px rgba(212, 175, 55, 0.2);
+}
+
+/* === PLAYLIST CARD === */
+.playlist-card {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.playlist-card:hover {
+  transform: translateY(-6px);
+  background: rgba(255,255,255,0.08) !important;
+}
+.playlist-card:hover .playlist-play-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+.playlist-play-btn {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* === STAGGER CHILDREN ANIMATION === */
+.stagger-children > * {
+  animation: staggerFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+
+@keyframes staggerFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === IDLE PULSE FOR PLAYER === */
+@keyframes idle-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.02); opacity: 0.8; }
+}
+.animate-idle-breathe {
+  animation: idle-breathe 4s ease-in-out infinite;
+}
+
+@keyframes idle-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(212,175,55,0.1); }
+  50% { box-shadow: 0 0 40px rgba(212,175,55,0.2); }
+}
+.animate-idle-glow {
+  animation: idle-glow 3s ease-in-out infinite;
+}
+
+@keyframes idle-ring {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.animate-idle-ring {
+  animation: idle-ring 20s linear infinite;
+}
+
 /* Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

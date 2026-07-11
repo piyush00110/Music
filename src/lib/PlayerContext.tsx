@@ -24,6 +24,9 @@ interface PlayerContextType extends PlayerState {
   setAudioQuality: (q: string) => void;
   setEqualizer: (band: string, val: number) => void;
   setSoundEffect: (effect: string, val: number | boolean) => void;
+  audioContext: AudioContext | null;
+  eqFilters: BiquadFilterNode[];
+  masterGain: GainNode | null;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -44,9 +47,8 @@ function migrateEQ(eq: any): PlayerState['equalizer'] {
   if (!eq || typeof eq !== 'object') {
     return { bass32: 0, bass64: 0, bass125: 0, lowMid250: 0, mid500: 0, mid1k: 0, mid2k: 0, high4k: 0, high8k: 0, high16k: 0, preset: 'Flat', mode: 'normal' };
   }
-  // Migrate from old 3-band format (bass/mid/treble with 0-100 range)
   if ('bass' in eq && !('bass32' in eq)) {
-    const b = (eq.bass - 50) * 0.48; // Scale 0-100 → -24 to +24
+    const b = (eq.bass - 50) * 0.48;
     const m = (eq.mid - 50) * 0.48;
     const t = (eq.treble - 50) * 0.48;
     return { bass32: b, bass64: b, bass125: b * 0.5, lowMid250: m * 0.3, mid500: m, mid1k: m, mid2k: m * 0.3, high4k: t * 0.5, high8k: t, high16k: t, preset: eq.preset || 'Flat', mode: eq.mode || 'normal' };
@@ -86,7 +88,7 @@ function loadYTAPI(): Promise<void> {
   ytLoading = new Promise<void>(resolve => {
     if (window.YT?.Player) { resolve(); return; }
     const timer = setTimeout(() => {
-      console.warn('YouTube IFrame API timed out, creating player anyway');
+      console.warn('YouTube IFrame API timed out');
       resolve();
     }, 10000);
     window.onYouTubeIframeAPIReady = () => { clearTimeout(timer); resolve(); };
@@ -98,6 +100,31 @@ function loadYTAPI(): Promise<void> {
   return ytLoading;
 }
 
+// ─── EQ Band definitions ───────────────────────────────────────
+export const EQ_BANDS = [
+  { key: 'bass32', freq: 32, label: '32Hz', type: 'lowshelf' as BiquadFilterType },
+  { key: 'bass64', freq: 64, label: '64Hz', type: 'peaking' as BiquadFilterType },
+  { key: 'bass125', freq: 125, label: '125Hz', type: 'peaking' as BiquadFilterType },
+  { key: 'lowMid250', freq: 250, label: '250Hz', type: 'peaking' as BiquadFilterType },
+  { key: 'mid500', freq: 500, label: '500Hz', type: 'peaking' as BiquadFilterType },
+  { key: 'mid1k', freq: 1000, label: '1kHz', type: 'peaking' as BiquadFilterType },
+  { key: 'mid2k', freq: 2000, label: '2kHz', type: 'peaking' as BiquadFilterType },
+  { key: 'high4k', freq: 4000, label: '4kHz', type: 'peaking' as BiquadFilterType },
+  { key: 'high8k', freq: 8000, label: '8kHz', type: 'peaking' as BiquadFilterType },
+  { key: 'high16k', freq: 16000, label: '16kHz', type: 'highshelf' as BiquadFilterType },
+];
+
+export const EQ_PRESETS: Record<string, Partial<PlayerState['equalizer']>> = {
+  'Flat': { bass32: 0, bass64: 0, bass125: 0, lowMid250: 0, mid500: 0, mid1k: 0, mid2k: 0, high4k: 0, high8k: 0, high16k: 0 },
+  'Bass Boost': { bass32: 10, bass64: 8, bass125: 5, lowMid250: 2, mid500: 0, mid1k: 0, mid2k: 0, high4k: 0, high8k: 0, high16k: 0 },
+  'Treble Boost': { bass32: 0, bass64: 0, bass125: 0, lowMid250: 0, mid500: 0, mid1k: 0, mid2k: 2, high4k: 5, high8k: 8, high16k: 10 },
+  'Vocal': { bass32: -3, bass64: -2, bass125: 0, lowMid250: 3, mid500: 6, mid1k: 7, mid2k: 4, high4k: 1, high8k: 0, high16k: 0 },
+  'Warm': { bass32: 6, bass64: 5, bass125: 4, lowMid250: 2, mid500: 0, mid1k: -1, mid2k: -3, high4k: 0, high8k: 2, high16k: 1 },
+  'Club': { bass32: 5, bass64: 4, bass125: 3, lowMid250: 1, mid500: 0, mid1k: 0, mid2k: 1, high4k: 3, high8k: 4, high16k: 0 },
+  'Headphone': { bass32: 3, bass64: 2, bass125: 0, lowMid250: 0, mid500: -1, mid1k: 0, mid2k: 1, high4k: 3, high8k: 4, high16k: 3 },
+  'Speaker': { bass32: 6, bass64: 5, bass125: 4, lowMid250: 1, mid500: -1, mid1k: -2, mid2k: 0, high4k: 3, high8k: 4, high16k: 0 },
+};
+
 // ─── Provider ───────────────────────────────────────────────────
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const ytPlayerRef = useRef<any>(null);
@@ -105,10 +132,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const ctxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const eqRefs = useRef<BiquadFilterNode[]>([]);
-  const crossfeedRef = useRef<GainNode | null>(null);
-  const stereoRef = useRef<StereoPannerNode | null>(null);
-  const convolverRef = useRef<ConvolverNode | null>(null);
-  const dynamicsRef = useRef<DynamicsCompressorNode | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const sRef = useRef<PlayerState>(defaultState());
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ytInitRef = useRef(false);
@@ -116,15 +141,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const ytFailedRef = useRef(false);
   const streamingRef = useRef(false);
   const pendingPlayRef = useRef<string | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const [state, setState] = useState<PlayerState>(defaultState);
   const [audioError, setAudioError] = useState<string | null>(null);
   sRef.current = state;
   const [volume, setVolumeState] = useState(state.volume);
   const [downloading, setDownloading] = useState(false);
 
-  // ── Init audio context for 10-band EQ + effects ────────────────
+  // ── EQ Frequencies ──────────────────────────────────────────
   const EQ_FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
+  // ── Init audio context for 10-band EQ + effects ────────────
   function initAudioContext(au: HTMLAudioElement) {
     try {
       const ctx = new AudioContext();
@@ -136,72 +163,83 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const f = ctx.createBiquadFilter();
         if (i === 0) { f.type = 'lowshelf'; f.frequency.value = EQ_FREQS[i]; }
         else if (i === EQ_FREQS.length - 1) { f.type = 'highshelf'; f.frequency.value = EQ_FREQS[i]; }
-        else { f.type = 'peaking'; f.frequency.value = EQ_FREQS[i]; f.Q.value = 1.4; }
+        else { f.type = 'peaking'; f.frequency.value = EQ_FREQS[i]; f.Q.value = 1.2; }
         f.gain.value = 0;
         filters.push(f);
       }
 
-      // Stereo crossfeed for headphone mode
-      const cf = ctx.createGain();
-      cf.gain.value = 0;
+      // Master gain for volume control
+      const mg = ctx.createGain();
+      mg.gain.value = 1.0;
 
-      // Stereo panner for surround effect
-      const sp = new StereoPannerNode(ctx, { pan: 0 });
+      // Compressor/limiter to prevent clipping
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -6;
+      comp.knee.value = 6;
+      comp.ratio.value = 4;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.15;
 
-      // Dynamic compressor for night mode
-      const dc = ctx.createDynamicsCompressor();
-      dc.threshold.value = 0;
-      dc.ratio.value = 1;
-
-      // Build chain: src → eq[0] → eq[1] → ... → eq[9] → cf → sp → dc → destination
+      // Build chain: src → eq[0] → ... → eq[9] → masterGain → compressor → destination
       src.connect(filters[0]);
       for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
-      filters[filters.length - 1].connect(cf);
-      cf.connect(sp);
-      sp.connect(dc);
-      dc.connect(ctx.destination);
+      filters[filters.length - 1].connect(mg);
+      mg.connect(comp);
+      comp.connect(ctx.destination);
 
       ctxRef.current = ctx;
       sourceRef.current = src;
       eqRefs.current = filters;
-      crossfeedRef.current = cf;
-      stereoRef.current = sp;
-      dynamicsRef.current = dc;
+      masterGainRef.current = mg;
+      compressorRef.current = comp;
     } catch (e) { console.error('initAudioContext error:', e); }
   }
 
+  // ── Apply EQ gains to filters ───────────────────────────────
   function applyEQ() {
     const eq = sRef.current.equalizer;
     const gains = [eq.bass32, eq.bass64, eq.bass125, eq.lowMid250, eq.mid500,
                    eq.mid1k, eq.mid2k, eq.high4k, eq.high8k, eq.high16k];
     for (let i = 0; i < eqRefs.current.length; i++) {
-      eqRefs.current[i].gain.value = Math.max(-24, Math.min(24, gains[i]));
+      const val = Math.max(-12, Math.min(12, gains[i]));
+      eqRefs.current[i].gain.setTargetAtTime(val, ctxRef.current?.currentTime || 0, 0.02);
     }
     // Apply mode presets
     if (eq.mode === 'headphone') {
-      if (eqRefs.current[8] && gains[8] === 0) eqRefs.current[8].gain.value = 2; // slight high boost
-      if (crossfeedRef.current) crossfeedRef.current.gain.value = 0.15; // light crossfeed
-      if (dynamicsRef.current) { dynamicsRef.current.threshold.value = -30; dynamicsRef.current.ratio.value = 3; }
+      if (eqRefs.current[8] && gains[8] === 0) eqRefs.current[8].gain.setTargetAtTime(2, ctxRef.current?.currentTime || 0, 0.02);
     } else if (eq.mode === 'speaker') {
-      if (eqRefs.current[0] && gains[0] === 0) eqRefs.current[0].gain.value = 3; // bass boost for speakers
-      if (eqRefs.current[4] && gains[4] === 0) eqRefs.current[4].gain.value = -1; // slight mid cut
-      if (eqRefs.current[8] && gains[8] === 0) eqRefs.current[8].gain.value = 2; // treble boost
-      if (crossfeedRef.current) crossfeedRef.current.gain.value = 0;
-      if (dynamicsRef.current) { dynamicsRef.current.threshold.value = -20; dynamicsRef.current.ratio.value = 2; }
-    } else {
-      if (crossfeedRef.current) crossfeedRef.current.gain.value = 0;
-      if (dynamicsRef.current) { dynamicsRef.current.threshold.value = 0; dynamicsRef.current.ratio.value = 1; }
+      if (eqRefs.current[0] && gains[0] === 0) eqRefs.current[0].gain.setTargetAtTime(3, ctxRef.current?.currentTime || 0, 0.02);
+      if (eqRefs.current[8] && gains[8] === 0) eqRefs.current[8].gain.setTargetAtTime(2, ctxRef.current?.currentTime || 0, 0.02);
     }
   }
 
+  // ── Apply sound effects ─────────────────────────────────────
   function applySoundEffects() {
-    const sfx = sRef.current.soundEffects;
-    if (stereoRef.current) {
-      stereoRef.current.pan.value = (sfx.surround3D || 0) / 200; // -0.5 to 0.5
-    }
-    if (dynamicsRef.current && sfx.nightMode) {
-      dynamicsRef.current.threshold.value = -30;
-      dynamicsRef.current.ratio.value = 20;
+    // Spatial audio via stereo panner not available in this chain
+    // Effects are visual indicators for now
+  }
+
+  // ── Acquire Wake Lock for background playback ───────────────
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        wakeLockRef.current?.addEventListener('release', () => {
+          wakeLockRef.current = null;
+        });
+      }
+    } catch {}
+  }
+
+  function releaseWakeLock() {
+    wakeLockRef.current?.release();
+    wakeLockRef.current = null;
+  }
+
+  // ── Resume AudioContext if suspended ────────────────────────
+  function ensureAudioContext() {
+    if (ctxRef.current?.state === 'suspended') {
+      ctxRef.current.resume().catch(() => {});
     }
   }
 
@@ -215,8 +253,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const au = new Audio();
     au.volume = state.volume;
+    au.crossOrigin = 'anonymous';
     audioRef.current = au;
     initAudioContext(au);
+
+    // Handle visibility change to keep audio playing
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        ensureAudioContext();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // Handle page blur/focus
+    const onBlur = () => { ensureAudioContext(); };
+    window.addEventListener('blur', onBlur);
 
     loadYTAPI().then(() => {
       if (!div || ytInitRef.current) return;
@@ -226,7 +277,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         try {
           ytPlayerRef.current = new YT.Player(div, {
             height: '0', width: '0',
-            playerVars: { autoplay: 0, controls: 0, disablekb: 1, enablejsapi: 1, fs: 0, modestbranding: 1 },
+            playerVars: { autoplay: 0, controls: 0, disablekb: 1, enablejsapi: 1, fs: 0, modestbranding: 1, origin: window.location.origin },
             events: {
               onReady: () => {
                 playerReadyRef.current = true;
@@ -244,7 +295,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 } else if (e.data === YT.PlayerState.ENDED) { onEnded(); }
               },
               onError: () => {
-                // YT playback failed — try stream fallback
                 const t = sRef.current.currentTrack;
                 if (t?.youtubeId) {
                   playViaStream(t.youtubeId);
@@ -262,10 +312,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onBlur);
       ytPlayerRef.current?.destroy();
       div.remove();
       au.src = '';
       ctxRef.current?.close();
+      releaseWakeLock();
     };
   }, []);
 
@@ -300,7 +353,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       } else {
         try { if (ytPlayerRef.current?.getCurrentTime) setState(prev => ({ ...prev, progress: ytPlayerRef.current.getCurrentTime() })); } catch {}
       }
-    }, 500);
+    }, 250);
     return () => clearInterval(iv);
   }, []);
 
@@ -364,6 +417,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   async function doPlay(track: Track, q?: Track[]) {
     setAudioError(null);
+    ensureAudioContext();
+    requestWakeLock();
     const queue = q || [track];
     const idx = q ? q.findIndex(t => t.id === track.id) : 0;
     setState(s => {
@@ -389,12 +444,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           return;
         } catch {}
       }
-      // Player not ready — if YT failed, stream directly
       if (ytFailedRef.current) {
         playViaStream(track.youtubeId, queue, idx);
         return;
       }
-      // Otherwise queue for when YT player becomes ready
       pendingPlayRef.current = track.youtubeId;
       return;
     }
@@ -427,7 +480,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       ytPlayerRef.current?.stopVideo();
       audioRef.current.src = track.preview;
       audioRef.current.volume = volume;
-      if (ctxRef.current?.state === 'suspended') ctxRef.current.resume();
+      ensureAudioContext();
       try {
         await audioRef.current.play();
         return;
@@ -456,7 +509,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       if (au) {
         au.src = data.url;
         au.volume = sRef.current.volume;
-        if (ctxRef.current?.state === 'suspended') ctxRef.current.resume();
+        ensureAudioContext();
         au.onended = () => { streamingRef.current = false; onEnded(); };
         await au.play();
       }
@@ -476,8 +529,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
   const resume = useCallback(() => {
     const s = sRef.current;
+    ensureAudioContext();
     if (streamingRef.current || useAudioSource(s.currentTrack)) {
-      if (ctxRef.current?.state === 'suspended') ctxRef.current.resume();
       audioRef.current?.play().catch(() => {});
     } else ytPlayerRef.current?.playVideo();
     setState(s => ({ ...s, isPlaying: true }));
@@ -530,30 +583,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setEqualizer = useCallback((bandOrMode: string, val: number) => {
-    // Handle mode change separately
     if (bandOrMode === 'mode') {
-      setState(s => ({ ...s, equalizer: { ...s.equalizer, mode: (['normal', 'headphone', 'speaker'] as const)[val] || 'normal' } }));
+      const modes: Array<'normal' | 'headphone' | 'speaker'> = ['normal', 'headphone', 'speaker'];
+      setState(s => ({ ...s, equalizer: { ...s.equalizer, mode: modes[val] || 'normal' } }));
+      setTimeout(applyEQ, 50);
       return;
     }
     if (bandOrMode === 'preset') {
-      const PRESET_NAMES = ['Flat', 'Bass Boost', 'Treble Boost', 'Vocal', 'Warm', 'Club', 'Headphone', 'Speaker'];
-      const presets: Record<string, Partial<typeof sRef.current.equalizer>> = {
-        'Flat': { bass32: 0, bass64: 0, bass125: 0, lowMid250: 0, mid500: 0, mid1k: 0, mid2k: 0, high4k: 0, high8k: 0, high16k: 0 },
-        'Bass Boost': { bass32: 8, bass64: 6, bass125: 4, lowMid250: 2, mid500: 0, mid1k: 0, mid2k: 0, high4k: 0, high8k: 0, high16k: 0 },
-        'Treble Boost': { bass32: 0, bass64: 0, bass125: 0, lowMid250: 0, mid500: 0, mid1k: 0, mid2k: 2, high4k: 4, high8k: 6, high16k: 8 },
-        'Vocal': { bass32: -2, bass64: -1, bass125: 0, lowMid250: 2, mid500: 4, mid1k: 5, mid2k: 3, high4k: 1, high8k: 0, high16k: 0 },
-        'Warm': { bass32: 5, bass64: 4, bass125: 3, lowMid250: 2, mid500: 0, mid1k: -1, mid2k: -2, high4k: 0, high8k: 2, high16k: 1 },
-        'Club': { bass32: 4, bass64: 3, bass125: 2, lowMid250: 1, mid500: 0, mid1k: 0, mid2k: 1, high4k: 2, high8k: 3, high16k: 0 },
-        'Headphone': { bass32: 2, bass64: 2, bass125: 0, lowMid250: 0, mid500: -1, mid1k: 0, mid2k: 1, high4k: 2, high8k: 3, high16k: 2, mode: 'headphone' },
-        'Speaker': { bass32: 5, bass64: 4, bass125: 3, lowMid250: 1, mid500: -1, mid1k: -2, mid2k: 0, high4k: 2, high8k: 3, high16k: 0, mode: 'speaker' },
-      };
+      const PRESET_NAMES = Object.keys(EQ_PRESETS);
       const name = PRESET_NAMES[val] || 'Flat';
-      const p = presets[name] || presets['Flat'];
+      const p = EQ_PRESETS[name] || EQ_PRESETS['Flat'];
       setState(s => ({ ...s, equalizer: { ...s.equalizer, ...p, preset: name } }));
       setTimeout(applyEQ, 50);
       return;
     }
-    setState(s => ({ ...s, equalizer: { ...s.equalizer, [bandOrMode]: Math.max(-24, Math.min(24, val)) } }));
+    setState(s => ({ ...s, equalizer: { ...s.equalizer, [bandOrMode]: Math.max(-12, Math.min(12, val)) } }));
     setTimeout(applyEQ, 50);
   }, []);
 
@@ -568,6 +612,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       play, pause, resume, next, prev, setVolume, seek,
       toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue,
       downloadCurrentTrack, setAudioQuality, setEqualizer, setSoundEffect,
+      audioContext: ctxRef.current,
+      eqFilters: eqRefs.current,
+      masterGain: masterGainRef.current,
     } as PlayerContextType}>
       {children}
     </PlayerContext.Provider>

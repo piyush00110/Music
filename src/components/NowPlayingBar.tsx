@@ -75,18 +75,17 @@ export default function NowPlayingBar() {
           <div className="flex items-center gap-3 px-3.5 pt-3 pb-1">
             {/* Album art with playing effect */}
             <div className="relative flex-shrink-0">
-              {/* Glow behind art when playing */}
-              {isPlaying && (
-                <div className="absolute -inset-1 rounded-xl opacity-60"
-                  style={{
-                    background: 'radial-gradient(circle, rgba(212,175,55,0.25) 0%, transparent 70%)',
-                    animation: 'npb-glow 2.5s ease-in-out infinite',
-                  }} />
-              )}
+              {/* Glow behind art - always showing */}
+              <div className="absolute -inset-1 rounded-xl opacity-60"
+                style={{
+                  background: 'radial-gradient(circle, rgba(212,175,55,0.25) 0%, transparent 70%)',
+                  animation: 'npb-glow 2.5s ease-in-out infinite',
+                  opacity: isPlaying ? 0.6 : 0.3,
+                }} />
               <div className="w-10 h-10 rounded-xl overflow-hidden relative"
                 style={{
-                  animation: isPlaying ? 'npb-pulse 3s ease-in-out infinite' : 'none',
-                  boxShadow: isPlaying ? '0 0 12px rgba(212,175,55,0.2)' : 'none',
+                  animation: isPlaying ? 'npb-pulse 3s ease-in-out infinite' : 'idle-breathe 4s ease-in-out infinite',
+                  boxShadow: isPlaying ? '0 0 12px rgba(212,175,55,0.2)' : '0 0 6px rgba(212,175,55,0.1)',
                 }}>
                 {artSrc ? (
                   <img src={artSrc} alt="" className="w-full h-full object-cover" />
@@ -95,29 +94,27 @@ export default function NowPlayingBar() {
                     <span className="material-symbols-outlined text-zinc-500 text-sm">music_note</span>
                   </div>
                 )}
-                {/* Spinning ring overlay when playing */}
-                {isPlaying && (
-                  <div className="absolute inset-0 rounded-xl pointer-events-none"
-                    style={{
-                      border: '1.5px solid rgba(212,175,55,0.15)',
-                      borderTop: '1.5px solid rgba(212,175,55,0.6)',
-                      animation: 'npb-ring-spin 2s linear infinite',
-                    }} />
-                )}
+                {/* Spinning ring overlay - always spinning */}
+                <div className="absolute inset-0 rounded-xl pointer-events-none"
+                  style={{
+                    border: '1.5px solid rgba(212,175,55,0.15)',
+                    borderTop: '1.5px solid rgba(212,175,55,0.6)',
+                    animation: `npb-ring-spin ${isPlaying ? '2s' : '8s'} linear infinite`,
+                  }} />
               </div>
-              {/* Mini equalizer bars on art */}
-              {isPlaying && (
-                <div className="absolute bottom-1 right-1 flex items-end gap-[2px] bg-black/50 backdrop-blur-sm rounded-sm px-1 py-0.5">
-                  {[0, 1, 2].map(i => (
-                    <div key={i} className="w-[2px] rounded-full bg-[#D4AF37]"
-                      style={{
-                        height: '8px',
-                        transformOrigin: 'bottom',
-                        animation: `npb-bars ${0.4 + i * 0.15}s ease-in-out infinite ${i * 0.1}s`,
-                      }} />
-                  ))}
-                </div>
-              )}
+              {/* Mini equalizer bars on art - always showing */}
+              <div className="absolute bottom-1 right-1 flex items-end gap-[2px] bg-black/50 backdrop-blur-sm rounded-sm px-1 py-0.5">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="w-[2px] rounded-full bg-[#D4AF37]"
+                    style={{
+                      height: '8px',
+                      transformOrigin: 'bottom',
+                      animation: isPlaying
+                        ? `npb-bars ${0.4 + i * 0.15}s ease-in-out infinite ${i * 0.1}s`
+                        : `idle-breathe ${2 + i * 0.5}s ease-in-out infinite ${i * 0.3}s`,
+                    }} />
+                ))}
+              </div>
             </div>
 
             <div className="flex-1 min-w-0">
@@ -193,29 +190,27 @@ export default function NowPlayingBar() {
           <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800 shadow-lg group-hover:shadow-xl transition-shadow">
             {artSrc ? (
               <img src={artSrc} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                style={{ animation: isPlaying ? 'npb-pulse 4s ease-in-out infinite' : 'none' }} />
+                style={{ animation: isPlaying ? 'npb-pulse 4s ease-in-out infinite' : 'idle-breathe 5s ease-in-out infinite' }} />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-zinc-600">music_note</span>
               </div>
             )}
-            {/* Playing indicator on desktop art */}
-            {isPlaying && (
-              <div className="absolute inset-0 rounded-lg pointer-events-none"
-                style={{ border: '1px solid rgba(212,175,55,0.25)' }} />
-            )}
-            {isPlaying && (
-              <div className="absolute bottom-1 right-1 flex items-end gap-[2px] bg-black/50 backdrop-blur-sm rounded-sm px-1 py-0.5">
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="w-[2px] rounded-full bg-[#D4AF37]"
-                    style={{
-                      height: '8px',
-                      transformOrigin: 'bottom',
-                      animation: `npb-bars ${0.4 + i * 0.15}s ease-in-out infinite ${i * 0.1}s`,
-                    }} />
-                ))}
-              </div>
-            )}
+            {/* Playing indicator on desktop art - always showing */}
+            <div className="absolute inset-0 rounded-lg pointer-events-none"
+              style={{ border: `1px solid ${isPlaying ? 'rgba(212,175,55,0.25)' : 'rgba(212,175,55,0.1)'}` }} />
+            <div className="absolute bottom-1 right-1 flex items-end gap-[2px] bg-black/50 backdrop-blur-sm rounded-sm px-1 py-0.5">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="w-[2px] rounded-full bg-[#D4AF37]"
+                  style={{
+                    height: '8px',
+                    transformOrigin: 'bottom',
+                    animation: isPlaying
+                      ? `npb-bars ${0.4 + i * 0.15}s ease-in-out infinite ${i * 0.1}s`
+                      : `idle-breathe ${2 + i * 0.5}s ease-in-out infinite ${i * 0.3}s`,
+                  }} />
+              ))}
+            </div>
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-white truncate group-hover:text-[#D4AF37] transition-colors"
@@ -234,9 +229,9 @@ export default function NowPlayingBar() {
           <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); isPlaying ? pause() : resume(); }}
             className="w-10 h-10 rounded-full flex items-center justify-center text-black active:scale-95 transition-all"
             style={{
-              background: isPlaying ? 'radial-gradient(circle, #f2ca50 0%, #d4af37 100%)' : undefined,
-              boxShadow: isPlaying ? '0 0 25px rgba(242,202,80,0.35), 0 0 50px rgba(242,202,80,0.1)' : undefined,
-              animation: isPlaying ? 'npb-glow 2s ease-in-out infinite' : 'none',
+              background: isPlaying ? 'radial-gradient(circle, #f2ca50 0%, #d4af37 100%)' : 'rgba(255,255,255,0.1)',
+              boxShadow: isPlaying ? '0 0 25px rgba(242,202,80,0.35), 0 0 50px rgba(242,202,80,0.1)' : 'none',
+              animation: 'npb-glow 2s ease-in-out infinite',
             }}>
             <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
               {isPlaying ? 'pause' : 'play_arrow'}
