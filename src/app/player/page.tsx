@@ -127,14 +127,15 @@ function DragSlider({ value, onChange, min = 0, max = 1, color = '#D4AF37', heig
 export default function PlayerPage() {
   const {
     currentTrack, isPlaying, queue, queueIndex,
-    progress, duration, volume, audioQuality,
+    progress, duration, volume, audioQuality, playbackSpeed,
     pause, resume, next, prev,
     setVolume, seek, toggleShuffle, toggleRepeat,
     shuffle, repeat, soundEffects, equalizer,
     setSoundEffect, setEqualizer, setAudioQuality,
     downloadCurrentTrack, downloading, audioError,
     liveSpectrum, loudnessDb, crossfade, crossfadeDuration,
-    toggleCrossfade, setCrossfadeDuration,
+    toggleCrossfade, setCrossfadeDuration, setPlaybackSpeed,
+    toggleFavorite, isFavorite,
   } = usePlayer();
   const [showQueue, setShowQueue] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -288,8 +289,8 @@ export default function PlayerPage() {
       {/* Menu */}
       {showMenu && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-          <div className="fixed top-20 right-5 z-50 glass-card rounded-2xl p-2 min-w-[200px] shadow-2xl shadow-black/60 scale-in">
+          <div className="fixed inset-0 z-50" onClick={() => setShowMenu(false)} />
+          <div className="fixed top-20 right-5 z-[60] glass-card rounded-2xl p-2 min-w-[200px] shadow-2xl shadow-black/60 scale-in">
             <button onClick={() => { setDrawerOpen(true); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-zinc-300 hover:bg-white/[0.06] transition-all active:scale-[0.98]">
               <span className="material-symbols-outlined text-[#D4AF37] text-lg">graphic_eq</span>
               Audio Experience
@@ -313,9 +314,9 @@ export default function PlayerPage() {
         <div className="flex-1 flex items-center justify-center relative py-4">
           <>
             <div className="absolute w-[300px] md:w-[340px] h-[300px] md:h-[340px] rounded-full pointer-events-none"
-              style={{ border: `2px solid ${dominantColor}15`, borderTop: `2px solid ${dominantColor}60`, borderRight: `2px solid ${dominantColor}20`, animation: `ring-spin ${isPlaying ? '4s' : '20s'} linear infinite`, top: '50%', left: '50%' }} />
+              style={{ border: `2px solid ${dominantColor}15`, borderTop: `2px solid ${dominantColor}60`, borderRight: `2px solid ${dominantColor}20`, animation: `ring-spin ${isPlaying ? '4s' : '20s'} linear infinite`, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
             <div className="absolute w-[320px] md:w-[360px] h-[320px] md:h-[360px] rounded-full pointer-events-none"
-              style={{ border: `1px solid ${accentColor}10`, borderBottom: `1px solid ${accentColor}40`, animation: `ring-spin-reverse ${isPlaying ? '6s' : '25s'} linear infinite`, top: '50%', left: '50%' }} />
+              style={{ border: `1px solid ${accentColor}10`, borderBottom: `1px solid ${accentColor}40`, animation: `ring-spin-reverse ${isPlaying ? '6s' : '25s'} linear infinite`, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
             <div className="absolute w-[280px] md:w-[320px] h-[280px] md:h-[320px] rounded-full pointer-events-none"
               style={{ border: `3px solid ${dominantColor}25`, animation: 'breathe-ring 3s ease-in-out infinite', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
           </>
@@ -332,7 +333,7 @@ export default function PlayerPage() {
           <div className="absolute inset-0 flex items-center justify-center gap-[3px] pointer-events-none">
             {[0.1, 0.3, 0.5, 0.2, 0.4, 0.6, 0.15, 0.35].map((d, i) => (
               <div key={i} className="w-[3px] rounded-full transition-all duration-500"
-                style={{ height: isPlaying ? `${20 + Math.sin(Date.now() * 0.001 + i) * 30 + 20}%` : `${10 + (i % 3) * 5}%`, background: `linear-gradient(to top, ${dominantColor}30, ${dominantColor})`, opacity: isPlaying ? 0.25 : 0.12, animation: isPlaying ? `spectrum-bar 1.2s ease-in-out ${d}s infinite` : `breathe-ring ${3 + i * 0.5}s ease-in-out infinite ${i * 0.3}s` }} />
+                style={{ height: isPlaying ? `${30 + (i % 4) * 15}%` : `${10 + (i % 3) * 5}%`, background: `linear-gradient(to top, ${dominantColor}30, ${dominantColor})`, opacity: isPlaying ? 0.25 : 0.12, animation: `spectrum-bar 1.2s ease-in-out ${d}s infinite` }} />
             ))}
           </div>
           <div className="relative">
@@ -382,8 +383,8 @@ export default function PlayerPage() {
               <span className="text-[9px] font-bold tracking-[0.1em] uppercase" style={{ color: `${dominantColor}CC` }}>HiFi • Stream Quality</span>
             </div>
           </div>
-          <button className="w-12 h-12 rounded-full bg-white/5 border border-white/[0.06] flex items-center justify-center active:scale-90 transition-all hover:bg-white/10 flex-shrink-0">
-            <span className="material-symbols-outlined text-[24px]" style={{ color: dominantColor, fontVariationSettings: "'FILL' 1" }}>favorite</span>
+          <button onClick={() => currentTrack && toggleFavorite(currentTrack.id)} className="w-12 h-12 rounded-full bg-white/5 border border-white/[0.06] flex items-center justify-center active:scale-90 transition-all hover:bg-white/10 flex-shrink-0">
+            <span className="material-symbols-outlined text-[24px]" style={{ color: currentTrack && isFavorite(currentTrack.id) ? '#ef4444' : dominantColor, fontVariationSettings: "'FILL' 1" }}>favorite</span>
           </button>
         </div>
 
@@ -645,6 +646,25 @@ export default function PlayerPage() {
               </div>
             </div>
 
+            {/* Playback Speed */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-medium">Playback Speed</p>
+                <span className="text-[11px] font-mono" style={{ color: dominantColor }}>{playbackSpeed}x</span>
+              </div>
+              <div className="flex gap-2">
+                {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map(s => (
+                  <button key={s} onClick={() => setPlaybackSpeed(s)}
+                    className={`flex-1 py-2 rounded-xl text-[11px] font-bold border transition-all duration-200 ${
+                      playbackSpeed === s ? 'text-black border-transparent' : 'text-zinc-400 border-white/10 hover:border-white/20'
+                    }`}
+                    style={playbackSpeed === s ? { backgroundColor: dominantColor } : {}}>
+                    {s}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Status */}
             <div className="space-y-3 pt-4 border-t border-white/[0.04]">
               <div className="flex items-center justify-center gap-3 text-zinc-600">
@@ -674,7 +694,7 @@ export default function PlayerPage() {
 
       {/* Queue overlay */}
       {showQueue && (
-        <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-2xl fade-in flex flex-col">
+        <div className="fixed inset-0 z-[55] bg-black/95 backdrop-blur-2xl fade-in flex flex-col">
           <div className="flex items-center justify-between px-5 pt-12 pb-3">
             <div>
               <h3 className="text-sm text-zinc-300 font-[family-name:var(--font-serif)]">Up Next</h3>

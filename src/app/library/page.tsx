@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Track } from '@/lib/types';
 import SongCard from '@/components/SongCard';
 import { usePlayer } from '@/lib/PlayerContext';
@@ -18,6 +19,7 @@ export default function LibraryPage() {
   const [tab, setTab] = useState<'playlists' | 'artists'>('playlists');
   const [loading, setLoading] = useState(true);
   const { play, recentlyPlayed } = usePlayer();
+  const router = useRouter();
 
   useEffect(() => {
     try {
@@ -56,7 +58,7 @@ export default function LibraryPage() {
             )}
           </div>
         </div>
-        <button className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all active:scale-90 border border-white/5">
+        <button onClick={() => router.push('/search')} className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all active:scale-90 border border-white/5">
           <span className="material-symbols-outlined text-[20px] text-[#D4AF37]">add</span>
         </button>
       </div>
@@ -82,7 +84,7 @@ export default function LibraryPage() {
       <section className="mb-8">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-white">Recents</h2>
-          <button className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
+          <button onClick={() => router.push('/search')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
             Show all
           </button>
         </div>
@@ -90,7 +92,7 @@ export default function LibraryPage() {
         {tab === 'playlists' ? (
           <div className="space-y-1">
             {/* Liked Songs */}
-            <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer group">
+            <div onClick={() => { if (items.length > 0) play(items[0].track, items.map(it => it.track)); }} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer group">
               <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-purple-500/40 to-blue-500/40 flex items-center justify-center relative">
                 <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
               </div>
@@ -105,7 +107,7 @@ export default function LibraryPage() {
 
             {/* Recently played tracks */}
             {recentlyPlayed.slice(0, 5).map((track, i) => (
-              <div key={`recent-lib-${track.id}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer group">
+              <div key={`recent-lib-${track.id}`} onClick={() => play(track, recentlyPlayed)} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer group">
                 <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
                   {track.album.cover_medium || track.youtubeId ? (
                     <img
@@ -164,7 +166,7 @@ export default function LibraryPage() {
               <a
                 key={artist.id}
                 href={`/search?q=${encodeURIComponent(artist.name)}`}
-                onClick={e => { e.preventDefault(); window.location.href = `/search?q=${encodeURIComponent(artist.name)}`; }}
+                onClick={e => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(artist.name)}`); }}
                 className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.04] transition-all cursor-pointer group"
               >
                 <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-zinc-800 shadow-md">
@@ -189,13 +191,13 @@ export default function LibraryPage() {
 
       {/* Add actions */}
       <section className="space-y-2">
-        <button className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all active:scale-[0.99]">
+        <button onClick={() => router.push('/search?q=artists')} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all active:scale-[0.99]">
           <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
             <span className="material-symbols-outlined text-xl text-white">add</span>
           </div>
           <span className="text-[14px] font-medium text-white">Add artists</span>
         </button>
-        <button className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all active:scale-[0.99]">
+        <button onClick={() => router.push('/search?q=podcasts')} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all active:scale-[0.99]">
           <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
             <span className="material-symbols-outlined text-xl text-white">add</span>
           </div>

@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Track } from '@/lib/types';
-import { getTrending, GENRES } from '@/lib/music';
+import { getTrending, searchMusic, GENRES } from '@/lib/music';
 import SongCard from '@/components/SongCard';
 import { usePlayer } from '@/lib/PlayerContext';
 import { TOP_ARTISTS, FEATURED_PLAYLISTS, MOOD_PLAYLISTS } from '@/lib/artists';
@@ -28,6 +29,7 @@ export default function HomePage() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const { play } = usePlayer();
+  const router = useRouter();
 
   useEffect(() => {
     async function load() {
@@ -130,7 +132,7 @@ export default function HomePage() {
             <a
               key={mood.id}
               href={`/search?q=${encodeURIComponent(mood.query)}`}
-              onClick={e => { e.preventDefault(); window.location.href = `/search?q=${encodeURIComponent(mood.query)}`; }}
+              onClick={e => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(mood.query)}`); }}
               className={`flex-shrink-0 w-28 md:w-32 h-36 md:h-40 rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${mood.color} border border-white/[0.06] hover:border-white/[0.15] transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] card-hover`}
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -147,7 +149,7 @@ export default function HomePage() {
       <section className="mb-8 md:mb-10">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg md:text-xl font-bold text-white">Popular Artists</h2>
-          <button className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
+          <button onClick={() => router.push('/search?q=artists')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
             Show all
           </button>
         </div>
@@ -156,7 +158,7 @@ export default function HomePage() {
             <a
               key={artist.id}
               href={`/search?q=${encodeURIComponent(artist.name)}`}
-              onClick={e => { e.preventDefault(); window.location.href = `/search?q=${encodeURIComponent(artist.name)}`; }}
+              onClick={e => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(artist.name)}`); }}
               className="flex-shrink-0 flex flex-col items-center gap-2.5 group cursor-pointer"
             >
               <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden artist-circle shadow-lg shadow-black/30 bg-zinc-800">
@@ -190,7 +192,7 @@ export default function HomePage() {
       <section className="mb-8 md:mb-10">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg md:text-xl font-bold text-white">Made for You</h2>
-          <button className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
+          <button onClick={() => router.push('/search?q=playlists')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
             Show all
           </button>
         </div>
@@ -198,6 +200,7 @@ export default function HomePage() {
           {FEATURED_PLAYLISTS.map((playlist, i) => (
             <div
               key={playlist.id}
+              onClick={() => router.push(`/search?q=${encodeURIComponent(playlist.title)}`)}
               className="flex-shrink-0 w-40 md:w-44 playlist-card rounded-xl overflow-hidden bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.12] cursor-pointer group"
             >
               <div className={`relative w-full aspect-square bg-gradient-to-br ${playlist.gradient} overflow-hidden`}>
@@ -205,7 +208,7 @@ export default function HomePage() {
                   <span className="material-symbols-outlined text-white/20 text-5xl">playlist_play</span>
                 </div>
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300" />
-                <button className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-xl shadow-[#D4AF37]/30 playlist-play-btn group-hover:scale-105 transition-transform">
+                <button onClick={(e) => { e.stopPropagation(); router.push(`/search?q=${encodeURIComponent(playlist.title)}`); }} className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-xl shadow-[#D4AF37]/30 playlist-play-btn group-hover:scale-105 transition-transform">
                   <span className="material-symbols-outlined text-black text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                 </button>
               </div>
@@ -229,7 +232,7 @@ export default function HomePage() {
               <a
                 key={genre.id}
                 href={`/search?q=${genre.name}`}
-                onClick={e => { e.preventDefault(); window.location.href = `/search?q=${genre.name}`; }}
+                onClick={e => { e.preventDefault(); router.push(`/search?q=${genre.name}`); }}
                 className={`h-20 md:h-24 rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${GENRE_COLORS[genre.name] || 'from-zinc-700/40 to-zinc-800/40'} border border-white/[0.06] hover:border-white/[0.15] transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] card-hover`}
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
@@ -246,7 +249,7 @@ export default function HomePage() {
       <section className="mb-8 md:mb-10">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg md:text-xl font-bold text-white">Recents</h2>
-          <button className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
+          <button onClick={() => router.push('/library')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
             Show all
           </button>
         </div>
@@ -285,7 +288,7 @@ export default function HomePage() {
                     <span className="material-symbols-outlined text-zinc-600 text-3xl">music_note</span>
                   </div>
                 )}
-                <button className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-xl shadow-[#D4AF37]/30 playlist-play-btn group-hover:scale-105 transition-transform">
+                <button onClick={(e) => { e.stopPropagation(); play(track, tracks); }} className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-xl shadow-[#D4AF37]/30 playlist-play-btn group-hover:scale-105 transition-transform">
                   <span className="material-symbols-outlined text-black text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                 </button>
               </div>

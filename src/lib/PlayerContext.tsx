@@ -26,6 +26,9 @@ interface PlayerContextType extends PlayerState {
   setSoundEffect: (effect: string, val: number | boolean) => void;
   setCrossfadeDuration: (d: number) => void;
   toggleCrossfade: () => void;
+  setPlaybackSpeed: (s: number) => void;
+  toggleFavorite: (trackId: number) => void;
+  isFavorite: (trackId: number) => boolean;
   audioContext: AudioContext | null;
   eqFilters: BiquadFilterNode[];
   masterGain: GainNode | null;
@@ -78,7 +81,7 @@ function defaultState(): PlayerState {
     showEqualizer: false, showSoundEffects: false, nowPlayingView: 'artwork',
     audioQuality: s.audioQuality || 'high', downloadFormat: 'mp3',
     equalizer: migrateEQ(s.equalizer),
-    soundEffects: { reverb: 0, bassBoost: 0, surround3D: 0, vocalBoost: 0, nightMode: false, stereoWidth: 0.5 },
+    soundEffects: { reverb: 0, bassBoost: 0, surround3D: 0, vocalBoost: 0, nightMode: false, spatialAudio: false, stereoWidth: 0.5 },
   };
 }
 
@@ -124,11 +127,12 @@ export const EQ_PRESETS: Record<string, Partial<PlayerState['equalizer']>> = {
   'Vocal': { bass32: -3, bass64: -2, bass125: 0, lowMid250: 3, mid500: 6, mid1k: 7, mid2k: 4, high4k: 1, high8k: 0, high16k: 0 },
   'Warm': { bass32: 6, bass64: 5, bass125: 4, lowMid250: 2, mid500: 0, mid1k: -1, mid2k: -3, high4k: 0, high8k: 2, high16k: 1 },
   'Club': { bass32: 5, bass64: 4, bass125: 3, lowMid250: 1, mid500: 0, mid1k: 0, mid2k: 1, high4k: 3, high8k: 4, high16k: 0 },
-  'Headphone': { bass32: 3, bass64: 2, bass125: 0, lowMid250: 0, mid500: -1, mid1k: 0, mid2k: 1, high4k: 3, high8k: 4, high16k: 3 },
-  'Speaker': { bass32: 6, bass64: 5, bass125: 4, lowMid250: 1, mid500: -1, mid1k: -2, mid2k: 0, high4k: 3, high8k: 4, high16k: 0 },
+  'Headphone': { bass32: 3, bass64: 2, bass125: 0, lowMid250: -1, mid500: -1, mid1k: 2, mid2k: 3, high4k: 4, high8k: 5, high16k: 4 },
+  'Speaker': { bass32: 4, bass64: 3, bass125: 2, lowMid250: -2, mid500: -2, mid1k: 1, mid2k: 3, high4k: 4, high8k: 5, high16k: 3 },
   'HiFi': { bass32: 2, bass64: 1, bass125: 0, lowMid250: -1, mid500: 0, mid1k: 1, mid2k: 2, high4k: 3, high8k: 4, high16k: 5 },
   'Loudness': { bass32: 8, bass64: 6, bass125: 3, lowMid250: 0, mid500: -2, mid1k: 0, mid2k: 2, high4k: 4, high8k: 6, high16k: 8 },
   'Podcast': { bass32: -2, bass64: -1, bass125: 0, lowMid250: 3, mid500: 5, mid1k: 6, mid2k: 4, high4k: 2, high8k: 0, high16k: -1 },
+  'Earbuds': { bass32: 5, bass64: 3, bass125: 1, lowMid250: -2, mid500: 0, mid1k: 3, mid2k: 5, high4k: 6, high8k: 5, high16k: 3 },
   'Acoustic': { bass32: 3, bass64: 2, bass125: 1, lowMid250: 0, mid500: 1, mid1k: 2, mid2k: 3, high4k: 2, high8k: 3, high16k: 4 },
   'Jazz': { bass32: 4, bass64: 3, bass125: 1, lowMid250: 2, mid500: 4, mid1k: 5, mid2k: 4, high4k: 3, high8k: 5, high16k: 6 },
   'Classical': { bass32: 3, bass64: 2, bass125: 0, lowMid250: -1, mid500: -2, mid1k: 0, mid2k: 2, high4k: 4, high8k: 5, high16k: 6 },
@@ -167,6 +171,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [liveSpectrum, setLiveSpectrum] = useState<Uint8Array>(new Uint8Array(64));
   const [loudnessDb, setLoudnessDb] = useState(-14);
 
+  // ── Favorites (persisted in localStorage) ──
+  const [favorites, setFavorites] = useState<Set<number>>(() => {
+    try {
+      const s = localStorage.getItem('aurelia-favorites');
+      return s ? new Set(JSON.parse(s)) : new Set();
+    } catch { return new Set(); }
+  });
+  const favoritesRef = useRef(favorites);
+  favoritesRef.current = favorites;
+
+  useEffect(() => {
+    try { localStorage.setItem('aurelia-favorites', JSON.stringify([...favorites])); } catch {}
+  }, [favorites]);
+
   const EQ_FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
   // Musical Q values: wider on lows/highs, tighter on mids for precision
   const EQ_Q = [0.7, 0.9, 1.0, 1.2, 1.4, 1.5, 1.4, 1.2, 0.9, 0.7];
@@ -178,6 +196,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const nightCompRef = useRef<DynamicsCompressorNode | null>(null);
   const bassBoostFilterRef = useRef<BiquadFilterNode | null>(null);
   const vocalBoostFilterRef = useRef<BiquadFilterNode | null>(null);
+  const presenceFilterRef = useRef<BiquadFilterNode | null>(null);
+  const demudFilterRef = useRef<BiquadFilterNode | null>(null);
   const midGainRef = useRef<GainNode | null>(null);
   const sideGainRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -240,9 +260,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
       const vocalBoost = ctx.createBiquadFilter();
       vocalBoost.type = 'peaking';
-      vocalBoost.frequency.value = 3200;
-      vocalBoost.Q.value = 1.8;
+      vocalBoost.frequency.value = 2800;
+      vocalBoost.Q.value = 1.0;
       vocalBoost.gain.value = 0;
+
+      // Presence clarity filter (boosts articulation for earbuds/speakers)
+      const presenceFilter = ctx.createBiquadFilter();
+      presenceFilter.type = 'peaking';
+      presenceFilter.frequency.value = 5500;
+      presenceFilter.Q.value = 1.2;
+      presenceFilter.gain.value = 0;
+
+      // De-mud filter (cuts boxy frequencies that muddy vocals on earbuds)
+      const demudFilter = ctx.createBiquadFilter();
+      demudFilter.type = 'peaking';
+      demudFilter.frequency.value = 400;
+      demudFilter.Q.value = 1.5;
+      demudFilter.gain.value = 0;
 
       const panner = ctx.createStereoPanner();
       panner.pan.value = 0;
@@ -294,11 +328,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
       // ── Harmonic exciter (tape saturation) ──
       const exciter = ctx.createWaveShaper();
-      const exciterCurve = new Float32Array(44100);
-      for (let i = 0; i < 44100; i++) {
-        const x = (i / 22050) * 2 - 1;
-        // Soft-clipping tape saturation curve with odd harmonics
-        exciterCurve[i] = Math.tanh(x * 1.2) * 0.95;
+      const curveLen = ctx.sampleRate;
+      const exciterCurve = new Float32Array(curveLen);
+      for (let i = 0; i < curveLen; i++) {
+        const x = (i / (curveLen / 2)) * 2 - 1;
+        // Warm tape saturation with odd harmonics
+        exciterCurve[i] = Math.tanh(x * 1.3) * 0.92 + Math.pow(Math.abs(x), 3) * 0.08 * Math.sign(x);
       }
       exciter.curve = exciterCurve;
       exciter.oversample = '4x';
@@ -308,7 +343,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
       filters[filters.length - 1].connect(bassBoost);
       bassBoost.connect(vocalBoost);
-      vocalBoost.connect(panner);
+      vocalBoost.connect(presenceFilter);
+      presenceFilter.connect(demudFilter);
+      demudFilter.connect(panner);
 
       panner.connect(splitter);
       splitter.connect(midGain, 0);
@@ -344,6 +381,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       nightCompRef.current = nightComp;
       bassBoostFilterRef.current = bassBoost;
       vocalBoostFilterRef.current = vocalBoost;
+      presenceFilterRef.current = presenceFilter;
+      demudFilterRef.current = demudFilter;
       midGainRef.current = midGain;
       sideGainRef.current = sideGain;
       analyserRef.current = analyser;
@@ -378,7 +417,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       bassBoostFilterRef.current.gain.setTargetAtTime(sfx.bassBoost * 10, t, 0.02);
     }
     if (vocalBoostFilterRef.current) {
-      vocalBoostFilterRef.current.gain.setTargetAtTime(sfx.vocalBoost * 6, t, 0.02);
+      vocalBoostFilterRef.current.gain.setTargetAtTime(sfx.vocalBoost * 8, t, 0.02);
+    }
+    if (presenceFilterRef.current) {
+      // Presence boost rides with vocal boost for earbud clarity
+      presenceFilterRef.current.gain.setTargetAtTime(sfx.vocalBoost * 5, t, 0.02);
+    }
+    if (demudFilterRef.current) {
+      // Cut mud when vocal boost is active for cleaner earbuds sound
+      demudFilterRef.current.gain.setTargetAtTime(sfx.vocalBoost > 0.3 ? -3 * sfx.vocalBoost : 0, t, 0.02);
     }
     if (reverbGainRef.current && dryGainRef.current) {
       const wet = sfx.reverb;
@@ -470,12 +517,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, 500);
   }
 
-  // ── Spectrum visualizer loop ──
+  // ── Spectrum visualizer loop (only when playing) ──
   useEffect(() => {
     let raf: number;
     const update = () => {
       const analyser = analyserRef.current;
-      if (analyser) {
+      if (analyser && sRef.current.isPlaying) {
         const bufLen = analyser.frequencyBinCount;
         const data = new Uint8Array(bufLen);
         analyser.getByteFrequencyData(data);
@@ -580,19 +627,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => cancelAnimationFrame(raf);
   }, [state.soundEffects.spatialAudio]);
 
+  // Debounced localStorage save
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    try {
-      const eq = sRef.current.equalizer;
-      const sfx = sRef.current.soundEffects;
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        volume, shuffle: state.shuffle, repeat: state.repeat,
-        audioQuality: state.audioQuality, crossfade: state.crossfade,
-        crossfadeDuration: state.crossfadeDuration,
-        equalizer: { ...eq }, soundEffects: { ...sfx },
-        recentlyPlayed: sRef.current.recentlyPlayed,
-      }));
-    } catch {}
-  }, [volume, state.shuffle, state.repeat, state.audioQuality, state.equalizer, state.soundEffects, state.crossfade, state.crossfadeDuration]);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        const s = sRef.current;
+        localStorage.setItem(LS_KEY, JSON.stringify({
+          volume, shuffle: s.shuffle, repeat: s.repeat,
+          audioQuality: s.audioQuality, crossfade: s.crossfade,
+          crossfadeDuration: s.crossfadeDuration,
+          equalizer: { ...s.equalizer }, soundEffects: { ...s.soundEffects },
+          recentlyPlayed: s.recentlyPlayed,
+        }));
+      } catch {}
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [volume, state.shuffle, state.repeat, state.audioQuality, state.crossfade, state.crossfadeDuration]);
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -665,18 +717,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     navigator.mediaSession.setActionHandler('stop', () => pause());
   }
 
-  function fadeOutCurrent(duration: number) {
-    const au = audioRef.current;
-    if (!au) return;
-    const currentVol = sRef.current.volume;
-    const steps = 20;
-    const stepTime = (duration * 1000) / steps;
-    let step = 0;
-    const fade = setInterval(() => {
-      step++;
-      if (step >= steps) { clearInterval(fade); au.volume = 0; au.pause(); au.volume = currentVol; }
-      else { au.volume = currentVol * (1 - step / steps); }
-    }, stepTime);
+  function fadeOutCurrent(duration: number): Promise<void> {
+    return new Promise(resolve => {
+      const au = audioRef.current;
+      if (!au || !streamingRef.current) { resolve(); return; }
+      const currentVol = sRef.current.volume;
+      const steps = 20;
+      const stepTime = (duration * 1000) / steps;
+      let step = 0;
+      const fade = setInterval(() => {
+        step++;
+        if (step >= steps) {
+          clearInterval(fade);
+          au.volume = 0;
+          au.pause();
+          au.volume = currentVol;
+          resolve();
+        } else {
+          au.volume = currentVol * (1 - step / steps);
+        }
+      }, stepTime);
+    });
   }
 
   async function doPlay(track: Track, q?: Track[]) {
@@ -935,13 +996,34 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const toggleCrossfade = useCallback(() => setState(s => ({ ...s, crossfade: !s.crossfade })), []);
   const setCrossfadeDuration = useCallback((d: number) => setState(s => ({ ...s, crossfadeDuration: d })), []);
 
+  const toggleFavorite = useCallback((trackId: number) => {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(trackId)) next.delete(trackId);
+      else next.add(trackId);
+      return next;
+    });
+  }, []);
+
+  const isFavorite = useCallback((trackId: number) => {
+    return favoritesRef.current.has(trackId);
+  }, []);
+
+  const setPlaybackSpeed = useCallback((speed: number) => {
+    const clamped = Math.max(0.5, Math.min(2.0, speed));
+    setState(s => ({ ...s, playbackSpeed: clamped }));
+    if (audioRef.current) audioRef.current.playbackRate = clamped;
+    if (ytPlayerRef.current?.setPlaybackRate) ytPlayerRef.current.setPlaybackRate(clamped);
+  }, []);
+
   return (
     <PlayerContext.Provider value={{
       ...state, audioError, downloading, liveSpectrum, loudnessDb,
       play, pause, resume, next, prev, setVolume, seek,
       toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue,
       downloadCurrentTrack, setAudioQuality, setEqualizer, setSoundEffect,
-      toggleCrossfade, setCrossfadeDuration,
+      toggleCrossfade, setCrossfadeDuration, setPlaybackSpeed,
+      toggleFavorite, isFavorite,
       audioContext: ctxRef.current,
       eqFilters: eqRefs.current,
       masterGain: masterGainRef.current,
