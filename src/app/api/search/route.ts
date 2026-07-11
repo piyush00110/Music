@@ -108,7 +108,7 @@ async function searchAudius(query: string) {
       artist: t.user?.name || 'Unknown',
       artistId: t.user?.id || i,
       duration: t.duration || 0,
-      cover: t.artwork?.url_100x100?.replace('100x100', '300x300') || '',
+      cover: t.artwork?.url_480x480 || t.artwork?.url_1000x1000 || t.artwork?.url_150x150 || '',
       stream: `${t.id}`,
       source: 'audius',
     }));

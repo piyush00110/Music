@@ -80,7 +80,7 @@ export async function getTrending(): Promise<Track[]> {
       const data = await res.json();
       for (const t of (data.data || []).slice(0, 25)) {
         const i = all.length + 1;
-        const cover = t.artwork?.url_100x100?.replace('100x100', '300x300') || '';
+        const cover = t.artwork?.url_480x480 || t.artwork?.url_1000x1000 || t.artwork?.url_150x150 || '';
         all.push({
           id: 5000 + i,
           title: t.title || '',
