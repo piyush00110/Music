@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import type { Track } from '@/lib/types';
 import { getTrending, searchMusic } from '@/lib/music';
 import { usePlayer } from '@/lib/PlayerContext';
@@ -90,8 +90,8 @@ export default function GalleryPage() {
               {img.src ? (
                 <img src={img.src} alt="" className="w-full h-full object-cover" loading="lazy" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-zinc-800">
-                  <span className="material-symbols-outlined text-3xl text-zinc-600">music_note</span>
+                <div className="w-full h-full flex items-center justify-center bg-[var(--bg-surface)]">
+                  <span className="material-symbols-outlined text-3xl text-[var(--text-tertiary)]">music_note</span>
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -115,12 +115,12 @@ export default function GalleryPage() {
       {/* Lightbox */}
       {selectedImg && (
         <div
-          className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 fade-in"
+          className="fixed inset-0 z-[60] bg-white/95 backdrop-blur-2xl flex items-center justify-center p-4 fade-in"
           onClick={() => setSelectedImg(null)}
         >
           <button
             onClick={() => setSelectedImg(null)}
-            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all active:scale-90 z-10"
+            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-black/10 flex items-center justify-center text-[var(--text-primary)] hover:bg-black/20 transition-all active:scale-90 z-10"
           >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>
@@ -132,11 +132,11 @@ export default function GalleryPage() {
               )}
             </div>
             <div className="text-center">
-              <h3 className="text-[17px] font-semibold text-white mb-1">{selectedImg.title}</h3>
+              <h3 className="text-[17px] font-semibold text-[var(--text-primary)] mb-1">{selectedImg.title}</h3>
               <p className="text-[13px] text-[var(--text-secondary)] mb-4">{selectedImg.artist}</p>
               <button
                 onClick={() => { play(selectedImg.track, images.map(i => i.track)); setSelectedImg(null); }}
-                className="px-8 py-2.5 bg-white text-black rounded-full text-[14px] font-semibold active:scale-95 transition-transform inline-flex items-center gap-2"
+                className="px-8 py-2.5 bg-[var(--accent)] text-white rounded-full text-[14px] font-semibold active:scale-95 transition-transform inline-flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-lg">play_arrow</span>
                 Play

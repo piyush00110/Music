@@ -29,7 +29,7 @@ export default function Recommendations() {
   return (
     <div className="w-full mt-6">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-[family-name:var(--font-serif)] text-white">You Might Also Like</h3>
+        <h3 className="text-sm font-[family-name:var(--font-serif)] text-[var(--text-primary)]">You Might Also Like</h3>
         {loading && <div className="w-4 h-4 rounded-full border border-[var(--accent)]/30 border-t-[var(--accent)] animate-spin" />}
       </div>
       <div className="grid gap-1">

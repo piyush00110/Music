@@ -138,7 +138,7 @@ function SearchContent() {
           onBlur={() => setIsFocused(false)}
           onKeyDown={handleKeyDown}
           placeholder="Search"
-          className="w-full pl-10 pr-10 py-2.5 bg-white/[0.06] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:bg-white/[0.1] transition-all duration-200 text-[15px]"
+          className="w-full pl-10 pr-10 py-2.5 bg-black/[0.05] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:bg-black/[0.08] transition-all duration-200 text-[15px] border border-[var(--border-subtle)]"
         />
         {query && (
           <button
@@ -151,11 +151,11 @@ function SearchContent() {
 
         {/* Suggestions */}
         {showSuggestions && suggestions.length > 0 && !restored.current && (
-          <div className="absolute top-full left-0 right-0 mt-2 rounded-xl overflow-hidden z-40 glass-panel shadow-lg">
+          <div className="absolute top-full left-0 right-0 mt-2 rounded-xl overflow-hidden z-40 glass-panel shadow-lg border border-[var(--border-subtle)]">
             {suggestions.map((s, i) => (
               <button
                 key={i}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.06] transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-black/[0.04] transition-colors"
                 onClick={() => { setQuery(s); doSearch(s); }}
               >
                 <span className="material-symbols-outlined text-[var(--text-tertiary)] text-lg">search</span>
@@ -175,9 +175,9 @@ function SearchContent() {
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.label}
-                  className="relative overflow-hidden rounded-xl p-4 h-24 flex items-end glass-card"
+                  className="relative overflow-hidden rounded-xl p-4 h-24 flex items-end border border-[var(--border-subtle)]"
                   style={{
-                    background: `linear-gradient(135deg, ${cat.color}22 0%, ${cat.color}08 100%)`,
+                    background: `linear-gradient(135deg, ${cat.color}18 0%, ${cat.color}08 100%)`,
                   }}
                 >
                   <span className="material-symbols-outlined text-3xl absolute top-3 right-3 opacity-30"
@@ -204,7 +204,7 @@ function SearchContent() {
                   <button
                     key={`hist-${i}`}
                     onClick={() => { setQuery(term); doSearch(term); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-black/[0.04] transition-colors text-left"
                   >
                     <span className="material-symbols-outlined text-[var(--text-tertiary)] text-lg">history</span>
                     <span className="text-[14px] text-[var(--text-secondary)] flex-1 truncate">{term}</span>
@@ -226,7 +226,7 @@ function SearchContent() {
                 <button
                   key={term}
                   onClick={() => { setQuery(term); doSearch(term); }}
-                  className="px-4 py-2 rounded-full bg-white/[0.06] text-[13px] text-[var(--text-secondary)] hover:bg-white/[0.1] transition-colors active:scale-95"
+                  className="px-4 py-2 rounded-full bg-black/[0.05] text-[13px] text-[var(--text-secondary)] hover:bg-black/[0.08] transition-colors active:scale-95 border border-[var(--border-subtle)]"
                 >
                   {term}
                 </button>

@@ -22,7 +22,6 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
     if (!track.youtubeId && !track.preview) return;
     setDl(true);
     try {
-      // Save to Supabase Storage first
       if (track.youtubeId) {
         showToast('Saving to library...', 'success');
         const url = await saveToStorage(track);
@@ -30,7 +29,6 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
           showToast('Saved to your library!', 'success');
         }
       }
-      // Then download locally
       const dlUrl = getTrackDownloadUrl(track);
       if (dlUrl) {
         const ext = track.youtubeId ? 'm4a' : (track.preview?.includes('mp4') ? 'm4a' : 'mp3');
@@ -38,7 +36,6 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
         await downloadFile(dlUrl, filename);
       }
     } catch {
-      // Fallback: just download locally
       const dlUrl = getTrackDownloadUrl(track);
       if (dlUrl) {
         const ext = track.youtubeId ? 'm4a' : (track.preview?.includes('mp4') ? 'm4a' : 'mp3');
@@ -79,17 +76,17 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
       `}
     >
       {showIndex && (
-        <span className={`w-5 text-center text-xs font-mono flex-shrink-0 ${isCurrentTrack ? 'text-[var(--accent)]' : 'text-zinc-600'}`}>
+        <span className={`w-5 text-center text-xs font-mono flex-shrink-0 ${isCurrentTrack ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}`}>
           {(index ?? 0) + 1}
         </span>
       )}
 
-      <div className="w-11 h-11 md:w-12 md:h-12 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--bg-surface)] shadow-md">
+      <div className="w-11 h-11 md:w-12 md:h-12 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--bg-surface)] shadow-sm">
         {artSrc ? (
           <img src={artSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="material-symbols-outlined text-zinc-600 text-lg">music_note</span>
+            <span className="material-symbols-outlined text-[var(--text-tertiary)] text-lg">music_note</span>
           </div>
         )}
       </div>
@@ -102,32 +99,32 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
       </div>
 
       <div className="flex items-center gap-1">
-        <span className="text-[11px] text-zinc-600 tabular-nums mr-1">{formatDuration(track.duration)}</span>
+        <span className="text-[11px] text-[var(--text-tertiary)] tabular-nums mr-1">{formatDuration(track.duration)}</span>
         <button
           onClick={(e) => { e.stopPropagation(); addToQueue(track); }}
-          className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90"
+          className="w-7 h-7 rounded-full hover:bg-black/5 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90"
           title="Add to queue"
         >
-          <span className="material-symbols-outlined text-[14px] text-zinc-400">queue_music</span>
+          <span className="material-symbols-outlined text-[14px] text-[var(--text-tertiary)]">queue_music</span>
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); handlePlay(); }}
-          className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90"
+          className="w-7 h-7 rounded-full hover:bg-black/5 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90"
         >
-          <span className="material-symbols-outlined text-[14px] text-zinc-400">
+          <span className="material-symbols-outlined text-[14px] text-[var(--text-tertiary)]">
             {isCurrentTrack && isPlaying ? 'pause' : 'play_arrow'}
           </span>
         </button>
         <button
           onClick={downloadTrack}
           disabled={dl}
-          className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 disabled:opacity-50"
+          className="w-7 h-7 rounded-full hover:bg-black/5 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 disabled:opacity-50"
           title="Download"
         >
           {dl ? (
             <div className="w-3 h-3 rounded-full border border-[var(--accent)]/30 border-t-[var(--accent)] animate-spin" />
           ) : (
-            <span className="material-symbols-outlined text-[14px] text-zinc-400">download</span>
+            <span className="material-symbols-outlined text-[14px] text-[var(--text-tertiary)]">download</span>
           )}
         </button>
       </div>

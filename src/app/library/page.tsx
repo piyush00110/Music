@@ -54,7 +54,7 @@ export default function LibraryPage() {
             className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-all duration-200 active:scale-95 ${
               tab === t
                 ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]'
-                : 'bg-white/[0.06] text-[var(--text-secondary)]'
+                : 'bg-black/[0.05] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
             }`}
           >
             {t === 'playlists' ? 'Playlists' : 'Artists'}
@@ -68,7 +68,7 @@ export default function LibraryPage() {
           <div className="space-y-0">
             {/* Liked Songs */}
             <div onClick={() => { if (items.length > 0) play(items[0].track, items.map(it => it.track)); }}
-              className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/[0.04] transition-all cursor-pointer">
+              className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/[0.04] transition-all cursor-pointer">
               <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-purple-500/40 to-blue-500/40 flex items-center justify-center">
                 <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
               </div>
@@ -83,8 +83,8 @@ export default function LibraryPage() {
             {/* Recently played */}
             {recentlyPlayed.slice(0, 5).map((track) => (
               <div key={`recent-lib-${track.id}`} onClick={() => play(track, recentlyPlayed)}
-                className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/[0.04] transition-all cursor-pointer">
-                <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
+                className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/[0.04] transition-all cursor-pointer">
+                <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                   {track.album.cover_medium || track.youtubeId ? (
                     <img
                       src={track.album.cover_medium || (track.youtubeId ? `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg` : '')}
@@ -94,7 +94,7 @@ export default function LibraryPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="material-symbols-outlined text-zinc-600 text-lg">music_note</span>
+                      <span className="material-symbols-outlined text-[var(--text-tertiary)] text-lg">music_note</span>
                     </div>
                   )}
                 </div>
@@ -108,8 +108,8 @@ export default function LibraryPage() {
             {/* Library items */}
             {items.map((item) => (
               <div key={item.track.id} onClick={() => play(item.track, items.map(it => it.track))}
-                className="group relative flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/[0.04] transition-all cursor-pointer">
-                <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
+                className="group relative flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/[0.04] transition-all cursor-pointer">
+                <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                   {item.track.album.cover_medium || item.track.youtubeId ? (
                     <img
                       src={item.track.album.cover_medium || (item.track.youtubeId ? `https://i.ytimg.com/vi/${item.track.youtubeId}/hqdefault.jpg` : '')}
@@ -119,7 +119,7 @@ export default function LibraryPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="material-symbols-outlined text-zinc-600 text-lg">music_note</span>
+                      <span className="material-symbols-outlined text-[var(--text-tertiary)] text-lg">music_note</span>
                     </div>
                   )}
                 </div>
@@ -151,15 +151,15 @@ export default function LibraryPage() {
                 key={artist.id}
                 href={`/search?q=${encodeURIComponent(artist.name)}`}
                 onClick={e => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(artist.name)}`); }}
-                className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/[0.04] transition-all cursor-pointer"
+                className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/[0.04] transition-all cursor-pointer"
               >
-                <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-zinc-800">
+                <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                   <img
                     src={artist.image}
                     alt={artist.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56"><rect width="56" height="56" fill="%23333"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="20" font-family="sans-serif">${artist.name.charAt(0)}</text></svg>`)}`;
+                      (e.target as HTMLImageElement).src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56"><rect width="56" height="56" fill="%23f2f2f7"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23636366" font-size="20" font-family="sans-serif">${artist.name.charAt(0)}</text></svg>`)}`;
                     }}
                   />
                 </div>

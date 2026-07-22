@@ -10,33 +10,6 @@ function formatTime(t: number) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function extractColors(imgSrc: string): Promise<string[]> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve(['#fc3c44']); return; }
-      canvas.width = 50; canvas.height = 50;
-      ctx.drawImage(img, 0, 0, 50, 50);
-      const data = ctx.getImageData(0, 0, 50, 50).data;
-      const colors: Record<string, number> = {};
-      for (let i = 0; i < data.length; i += 16) {
-        const r = Math.round(data[i] / 40) * 40;
-        const g = Math.round(data[i + 1] / 40) * 40;
-        const b = Math.round(data[i + 2] / 40) * 40;
-        const key = `${r},${g},${b}`;
-        colors[key] = (colors[key] || 0) + 1;
-      }
-      const sorted = Object.entries(colors).sort((a, b) => b[1] - a[1]);
-      resolve(sorted.slice(0, 3).map(([k]) => { const [r, g, b] = k.split(',').map(Number); return `rgb(${r},${g},${b})`; }));
-    };
-    img.onerror = () => resolve(['#fc3c44']);
-    img.src = imgSrc;
-  });
-}
-
 function DragSlider({ value, onChange, min = 0, max = 1, color = '#fc3c44', height = false }: {
   value: number; onChange: (v: number) => void; min?: number; max?: number; color?: string; height?: boolean;
 }) {
@@ -82,22 +55,22 @@ function DragSlider({ value, onChange, min = 0, max = 1, color = '#fc3c44', heig
   if (height) {
     return (
       <div ref={trackRef} className="relative w-8 h-28 cursor-pointer group" onMouseDown={handleStart} onTouchStart={handleStart}>
-        <div className="absolute inset-0 w-full h-full rounded-full bg-white/[0.08] overflow-hidden">
+        <div className="absolute inset-0 w-full h-full rounded-full bg-black/[0.06] overflow-hidden">
           <div className="absolute bottom-0 left-0 w-full rounded-full transition-all" style={{ height: `${pct}%`, background: color }} />
         </div>
-        <div className="absolute left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-lg transition-all"
-          style={{ bottom: `calc(${pct}% - 7px)`, boxShadow: dragging ? `0 0 10px ${color}` : '0 2px 6px rgba(0,0,0,0.4)', transform: `translateX(-50%) scale(${dragging ? 1.2 : 1})` }} />
+        <div className="absolute left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-[var(--accent)] shadow-md transition-all"
+          style={{ bottom: `calc(${pct}% - 7px)`, boxShadow: dragging ? `0 0 10px ${color}` : '0 2px 6px rgba(0,0,0,0.15)', transform: `translateX(-50%) scale(${dragging ? 1.2 : 1})` }} />
       </div>
     );
   }
 
   return (
     <div ref={trackRef} className="relative w-full h-5 flex items-center cursor-pointer group" onMouseDown={handleStart} onTouchStart={handleStart}>
-      <div className="absolute w-full h-[3px] rounded-full bg-white/[0.12] overflow-hidden">
+      <div className="absolute w-full h-[3px] rounded-full bg-black/[0.08] overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <div className="absolute w-3 h-3 rounded-full bg-white shadow-lg transition-all"
-        style={{ left: `${pct}%`, transform: `translateX(-50%) scale(${dragging ? 1.3 : 1})`, boxShadow: dragging ? `0 0 10px ${color}` : '0 2px 6px rgba(0,0,0,0.4)' }} />
+      <div className="absolute w-3 h-3 rounded-full bg-[var(--accent)] shadow-md transition-all"
+        style={{ left: `${pct}%`, transform: `translateX(-50%) scale(${dragging ? 1.3 : 1})`, boxShadow: dragging ? `0 0 10px ${color}` : '0 2px 6px rgba(0,0,0,0.15)' }} />
     </div>
   );
 }
@@ -133,9 +106,8 @@ export default function PlayerPage() {
   const [sleepTimerRemaining, setSleepTimerRemaining] = useState(0);
   const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Sample synced lyrics (in a real app, fetch from an API)
   const [lyrics] = useState([
-    { time: 0, text: '♪' },
+    { time: 0, text: '\u266a' },
     { time: 5, text: 'When the sun shines, we shine together' },
     { time: 10, text: 'Told you I\'ll be here forever' },
     { time: 15, text: 'Said I\'ll always be your friend' },
@@ -195,10 +167,30 @@ export default function PlayerPage() {
 
   useEffect(() => {
     if (!artSrc) return;
-    extractColors(artSrc).then(colors => {
-      setDominantColor(colors[0] || '#fc3c44');
-      setAccentColor(colors[1] || colors[0] || '#ff5a5f');
-    });
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      canvas.width = 50; canvas.height = 50;
+      ctx.drawImage(img, 0, 0, 50, 50);
+      const data = ctx.getImageData(0, 0, 50, 50).data;
+      const colors: Record<string, number> = {};
+      for (let i = 0; i < data.length; i += 16) {
+        const r = Math.round(data[i] / 40) * 40;
+        const g = Math.round(data[i + 1] / 40) * 40;
+        const b = Math.round(data[i + 2] / 40) * 40;
+        const key = `${r},${g},${b}`;
+        colors[key] = (colors[key] || 0) + 1;
+      }
+      const sorted = Object.entries(colors).sort((a, b) => b[1] - a[1]);
+      if (sorted.length > 0) {
+        const [r, g, b] = sorted[0][0].split(',').map(Number);
+        setDominantColor(`rgb(${r},${g},${b})`);
+      }
+    };
+    img.src = artSrc;
   }, [artSrc]);
 
   const updateSeekPosition = useCallback((clientX: number) => {
@@ -251,7 +243,7 @@ export default function PlayerPage() {
     return (
       <div className="flex items-center justify-center min-h-[70vh] px-4">
         <div className="text-center scale-in">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center border border-[var(--border-subtle)]">
             <span className="material-symbols-outlined text-3xl text-[var(--text-tertiary)]">music_note</span>
           </div>
           <p className="text-[var(--text-secondary)] text-base mb-1 font-medium">No track playing</p>
@@ -268,23 +260,22 @@ export default function PlayerPage() {
   return (
     <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-[var(--accent)]/30">
       {/* Background */}
-      <div className="fixed inset-0 z-0">
+      <div className="fixed inset-0 z-0 bg-[var(--bg-primary)]">
         {artSrc && (
-          <div className="absolute inset-0 blur-[80px] scale-110 opacity-40" style={{ backgroundImage: `url(${artSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          <div className="absolute inset-0 blur-[80px] scale-110 opacity-30" style={{ backgroundImage: `url(${artSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
         )}
-        <div className="absolute inset-0 bg-black/70" />
-        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 0%, ${dominantColor}08 50%, transparent 100%)` }} />
+        <div className="absolute inset-0 bg-white/80" />
       </div>
 
       {/* Header */}
       <header className="fixed top-0 w-full z-50 flex items-center justify-between px-5 py-4">
-        <button onClick={() => setDrawerOpen(!drawerOpen)} className="w-9 h-9 rounded-full bg-white/5 backdrop-blur-xl flex items-center justify-center active:scale-90 transition-all">
+        <button onClick={() => setDrawerOpen(!drawerOpen)} className="w-9 h-9 rounded-full bg-black/5 backdrop-blur-xl flex items-center justify-center active:scale-90 transition-all">
           <span className="material-symbols-outlined text-[20px] text-[var(--text-secondary)]">chevron_down</span>
         </button>
         <div className="text-center">
           <p className="text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] font-medium">Now Playing</p>
         </div>
-        <button onClick={() => setShowMenu(!showMenu)} className="w-9 h-9 rounded-full bg-white/5 backdrop-blur-xl flex items-center justify-center active:scale-90 transition-all">
+        <button onClick={() => setShowMenu(!showMenu)} className="w-9 h-9 rounded-full bg-black/5 backdrop-blur-xl flex items-center justify-center active:scale-90 transition-all">
           <span className="material-symbols-outlined text-[20px] text-[var(--text-secondary)]">more_horiz</span>
         </button>
       </header>
@@ -293,21 +284,21 @@ export default function PlayerPage() {
       {showMenu && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setShowMenu(false)} />
-          <div className="fixed top-16 right-4 z-[65] glass-card rounded-xl p-1.5 min-w-[180px] shadow-2xl scale-in">
-            <button onClick={() => { setDrawerOpen(true); setShowMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-[var(--text-primary)] hover:bg-white/[0.06] transition-all">
+          <div className="fixed top-16 right-4 z-[65] glass-card rounded-xl p-1.5 min-w-[180px] shadow-xl scale-in border border-[var(--border-subtle)]">
+            <button onClick={() => { setDrawerOpen(true); setShowMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-[var(--text-primary)] hover:bg-black/[0.04] transition-all">
               <span className="material-symbols-outlined text-[var(--accent)] text-[18px]">graphic_eq</span>
               Audio Settings
             </button>
-            <button onClick={() => { setShowQueue(true); setShowMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-[var(--text-primary)] hover:bg-white/[0.06] transition-all">
+            <button onClick={() => { setShowQueue(true); setShowMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-[var(--text-primary)] hover:bg-black/[0.04] transition-all">
               <span className="material-symbols-outlined text-[var(--text-secondary)] text-[18px]">queue_music</span>
               Queue
             </button>
-            <button onClick={() => { setLyricsOpen(true); setShowMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-[var(--text-primary)] hover:bg-white/[0.06] transition-all">
+            <button onClick={() => { setLyricsOpen(true); setShowMenu(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-[var(--text-primary)] hover:bg-black/[0.04] transition-all">
               <span className="material-symbols-outlined text-[var(--text-secondary)] text-[18px]">lyrics</span>
               Lyrics
             </button>
-            <div className="h-px bg-white/[0.06] my-1" />
-            <button onClick={() => { downloadCurrentTrack(); setShowMenu(false); }} disabled={downloading} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-[var(--text-primary)] hover:bg-white/[0.06] transition-all disabled:opacity-40">
+            <div className="h-px bg-[var(--border-subtle)] my-1" />
+            <button onClick={() => { downloadCurrentTrack(); setShowMenu(false); }} disabled={downloading} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-[var(--text-primary)] hover:bg-black/[0.04] transition-all disabled:opacity-40">
               {downloading ? <div className="w-4 h-4 rounded-full border border-[var(--text-tertiary)]/30 border-t-[var(--text-secondary)] animate-spin" /> : <span className="material-symbols-outlined text-[var(--text-secondary)] text-[18px]">download</span>}
               {downloading ? 'Saving...' : 'Download'}
             </button>
@@ -323,7 +314,7 @@ export default function PlayerPage() {
             <div
               className="w-[260px] h-[260px] md:w-[300px] md:h-[300px] rounded-2xl overflow-hidden shadow-2xl"
               style={{
-                boxShadow: isPlaying ? `0 20px 60px rgba(0,0,0,0.6), 0 0 80px ${dominantColor}20` : '0 20px 50px rgba(0,0,0,0.5)',
+                boxShadow: isPlaying ? `0 20px 60px rgba(0,0,0,0.15), 0 0 80px ${dominantColor}15` : '0 20px 50px rgba(0,0,0,0.12)',
                 animation: isPlaying ? 'idle-breathe 4s ease-in-out infinite' : 'none',
               }}
             >
@@ -341,7 +332,7 @@ export default function PlayerPage() {
         {/* Track Info */}
         <div className="flex items-end justify-between mt-5 px-1">
           <div className="min-w-0 flex-1">
-            <h1 className="text-[20px] md:text-[22px] font-bold text-white tracking-tight truncate">{currentTrack.title}</h1>
+            <h1 className="text-[20px] md:text-[22px] font-bold text-[var(--text-primary)] tracking-tight truncate">{currentTrack.title}</h1>
             <p className="text-[14px] text-[var(--text-secondary)] truncate mt-0.5">{currentTrack.artist.name}</p>
           </div>
           <button onClick={() => currentTrack && toggleFavorite(currentTrack.id)} className="w-10 h-10 flex items-center justify-center active:scale-90 transition-all flex-shrink-0 ml-3">
@@ -352,9 +343,9 @@ export default function PlayerPage() {
         {/* Progress */}
         <div className="mt-4 px-1">
           <div ref={progressRef} className="relative w-full h-1 cursor-pointer group rounded-full" onMouseDown={handleSeekStart} onTouchStart={handleSeekStart}>
-            <div className="absolute inset-0 rounded-full bg-white/[0.12]" />
+            <div className="absolute inset-0 rounded-full bg-black/[0.08]" />
             <div className="absolute top-0 left-0 h-full rounded-full transition-all duration-75" style={{ width: `${displayPct}%`, background: 'var(--accent)' }} />
-            <div className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white shadow-lg transition-all duration-75 ${seeking ? 'scale-125 opacity-100' : 'scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100'}`} style={{ left: `${displayPct}%` }} />
+            <div className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-[var(--accent)] shadow-md transition-all duration-75 ${seeking ? 'scale-125 opacity-100' : 'scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100'}`} style={{ left: `${displayPct}%` }} />
           </div>
           <div className="flex justify-between mt-1.5 text-[10px] text-[var(--text-tertiary)] font-medium tabular-nums">
             <span className="w-10 text-left">{formatTime(progress)}</span>
@@ -369,15 +360,15 @@ export default function PlayerPage() {
           </button>
           <div className="flex items-center gap-6">
             <button onClick={prev} className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-all">
-              <span className="material-symbols-outlined text-[30px] text-white">skip_previous</span>
+              <span className="material-symbols-outlined text-[30px] text-[var(--text-primary)]">skip_previous</span>
             </button>
             <button onClick={() => (isPlaying ? pause() : resume())}
-              className="w-[60px] h-[60px] rounded-full flex items-center justify-center active:scale-90 transition-all bg-white"
-              style={{ boxShadow: isPlaying ? `0 0 30px ${dominantColor}40` : '0 4px 15px rgba(0,0,0,0.3)' }}>
-              <span className="material-symbols-outlined text-[32px] text-black" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
+              className="w-[60px] h-[60px] rounded-full flex items-center justify-center active:scale-90 transition-all bg-[var(--accent)]"
+              style={{ boxShadow: isPlaying ? `0 0 30px ${dominantColor}30` : '0 4px 15px rgba(252,60,68,0.3)' }}>
+              <span className="material-symbols-outlined text-[32px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
             </button>
             <button onClick={next} className="w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-all">
-              <span className="material-symbols-outlined text-[30px] text-white">skip_next</span>
+              <span className="material-symbols-outlined text-[30px] text-[var(--text-primary)]">skip_next</span>
             </button>
           </div>
           <button onClick={toggleRepeat} className={`w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 relative ${repeat !== 'off' ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}`}>
@@ -405,13 +396,13 @@ export default function PlayerPage() {
 
       {/* Lyrics Overlay */}
       {lyricsOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/95 backdrop-blur-xl fade-in flex flex-col">
+        <div className="fixed inset-0 z-[70] bg-white/98 backdrop-blur-xl fade-in flex flex-col">
           <div className="flex items-center justify-between px-5 pt-12 pb-3">
             <div className="w-9" />
             <div className="text-center">
               <p className="text-[11px] text-[var(--text-tertiary)] uppercase tracking-[0.15em]">Lyrics</p>
             </div>
-            <button onClick={() => setLyricsOpen(false)} className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center">
+            <button onClick={() => setLyricsOpen(false)} className="w-9 h-9 rounded-full bg-black/5 flex items-center justify-center">
               <span className="material-symbols-outlined text-[18px] text-[var(--text-secondary)]">close</span>
             </button>
           </div>
@@ -423,20 +414,20 @@ export default function PlayerPage() {
             ))}
           </div>
           {/* Mini player at bottom of lyrics */}
-          <div className="fixed bottom-0 left-0 right-0 z-[75] px-5 pb-8 pt-3" style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.95))' }}>
+          <div className="fixed bottom-0 left-0 right-0 z-[75] px-5 pb-8 pt-3 bg-white/95 backdrop-blur-xl border-t border-[var(--border-subtle)]">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+              <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border border-[var(--border-subtle)]">
                 {artSrc ? <img src={artSrc} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-[var(--bg-surface)]" />}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold text-white truncate">{currentTrack.title}</p>
+                <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{currentTrack.title}</p>
                 <p className="text-[11px] text-[var(--text-secondary)] truncate">{currentTrack.artist.name}</p>
               </div>
-              <button onClick={() => (isPlaying ? pause() : resume())} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
+              <button onClick={() => (isPlaying ? pause() : resume())} className="w-9 h-9 rounded-full bg-black/5 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[var(--text-primary)] text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>{isPlaying ? 'pause' : 'play_arrow'}</span>
               </button>
             </div>
-            <div className="relative w-full h-[3px] rounded-full bg-white/[0.12]">
+            <div className="relative w-full h-[3px] rounded-full bg-black/[0.08]">
               <div className="absolute top-0 left-0 h-full rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
             </div>
           </div>
@@ -445,13 +436,13 @@ export default function PlayerPage() {
 
       {/* Queue overlay */}
       {showQueue && (
-        <div className="fixed inset-0 z-[58] bg-black/95 backdrop-blur-xl fade-in flex flex-col">
+        <div className="fixed inset-0 z-[58] bg-white/98 backdrop-blur-xl fade-in flex flex-col">
           <div className="flex items-center justify-between px-5 pt-12 pb-3">
             <div>
-              <h3 className="text-[15px] text-white font-semibold">Up Next</h3>
+              <h3 className="text-[15px] text-[var(--text-primary)] font-semibold">Up Next</h3>
               <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">{queue.length} tracks</p>
             </div>
-            <button onClick={() => setShowQueue(false)} className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center">
+            <button onClick={() => setShowQueue(false)} className="w-9 h-9 rounded-full bg-black/5 flex items-center justify-center">
               <span className="material-symbols-outlined text-[18px] text-[var(--text-secondary)]">close</span>
             </button>
           </div>
@@ -461,8 +452,8 @@ export default function PlayerPage() {
               return (
                 <div key={`${track.source || 'queue'}-${track.id}`}
                   className="flex items-center gap-3 p-2.5 rounded-xl transition-all"
-                  style={i === queueIndex ? { backgroundColor: `${dominantColor}0D` } : {}}>
-                  {trackSrc ? <img src={trackSrc} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <div className="w-10 h-10 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center"><span className="material-symbols-outlined text-[var(--text-tertiary)] text-sm">music_note</span></div>}
+                  style={i === queueIndex ? { backgroundColor: `rgba(252, 60, 68, 0.06)` } : {}}>
+                  {trackSrc ? <img src={trackSrc} alt="" className="w-10 h-10 rounded-lg object-cover border border-[var(--border-subtle)]" /> : <div className="w-10 h-10 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center border border-[var(--border-subtle)]"><span className="material-symbols-outlined text-[var(--text-tertiary)] text-sm">music_note</span></div>}
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium truncate" style={{ color: i === queueIndex ? 'var(--accent)' : 'var(--text-primary)' }}>{track.title}</p>
                     <p className="text-[11px] text-[var(--text-tertiary)] truncate">{track.artist.name}</p>
@@ -476,14 +467,14 @@ export default function PlayerPage() {
       )}
 
       {/* Audio Settings Drawer */}
-      <div className={`fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setDrawerOpen(false)} />
+      <div className={`fixed inset-0 z-[55] bg-black/20 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setDrawerOpen(false)} />
       <div className={`fixed bottom-0 left-0 w-full z-[56] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}>
-        <div className="glass-panel rounded-t-[20px] px-6 pt-3 pb-10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] max-h-[80vh] overflow-y-auto">
+        <div className="glass-panel rounded-t-[20px] px-6 pt-3 pb-10 shadow-[0_-20px_60px_rgba(0,0,0,0.1)] max-h-[80vh] overflow-y-auto border-t border-[var(--border-subtle)]">
           <div className="flex flex-col items-center cursor-pointer mb-5" onClick={() => setDrawerOpen(false)}>
-            <div className="w-9 h-1 bg-white/10 rounded-full" />
+            <div className="w-9 h-1 bg-black/10 rounded-full" />
           </div>
           <div className="max-w-md mx-auto space-y-5">
-            <h3 className="text-[17px] font-bold text-white">Audio Settings</h3>
+            <h3 className="text-[17px] font-bold text-[var(--text-primary)]">Audio Settings</h3>
 
             {/* Volume */}
             <div>
@@ -495,36 +486,36 @@ export default function PlayerPage() {
             </div>
 
             {/* Bass Boost */}
-            <div className="p-3 rounded-xl bg-white/[0.04]">
+            <div className="p-3 rounded-xl bg-black/[0.03]">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[12px] text-white font-medium">Bass Boost</span>
+                <span className="text-[12px] text-[var(--text-primary)] font-medium">Bass Boost</span>
                 <span className="text-[10px] font-mono text-[var(--accent)]">{Math.round(soundEffects.bassBoost * 100)}%</span>
               </div>
               <DragSlider value={soundEffects.bassBoost} onChange={(v) => setSoundEffect('bassBoost', v)} min={0} max={1} />
             </div>
 
             {/* Vocal Clarity */}
-            <div className="p-3 rounded-xl bg-white/[0.04]">
+            <div className="p-3 rounded-xl bg-black/[0.03]">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[12px] text-white font-medium">Vocal Clarity</span>
+                <span className="text-[12px] text-[var(--text-primary)] font-medium">Vocal Clarity</span>
                 <span className="text-[10px] font-mono text-[var(--accent)]">{Math.round(soundEffects.vocalBoost * 100)}%</span>
               </div>
               <DragSlider value={soundEffects.vocalBoost} onChange={(v) => setSoundEffect('vocalBoost', v)} min={0} max={1} />
             </div>
 
             {/* Reverb */}
-            <div className="p-3 rounded-xl bg-white/[0.04]">
+            <div className="p-3 rounded-xl bg-black/[0.03]">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[12px] text-white font-medium">Reverb</span>
+                <span className="text-[12px] text-[var(--text-primary)] font-medium">Reverb</span>
                 <span className="text-[10px] font-mono text-[var(--accent)]">{Math.round(soundEffects.reverb * 100)}%</span>
               </div>
               <DragSlider value={soundEffects.reverb} onChange={(v) => setSoundEffect('reverb', v)} min={0} max={1} />
             </div>
 
             {/* Stereo Width */}
-            <div className="p-3 rounded-xl bg-white/[0.04]">
+            <div className="p-3 rounded-xl bg-black/[0.03]">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[12px] text-white font-medium">Stereo Width</span>
+                <span className="text-[12px] text-[var(--text-primary)] font-medium">Stereo Width</span>
                 <span className="text-[10px] font-mono text-[var(--accent)]">{Math.round((soundEffects.stereoWidth ?? 0.5) * 100)}%</span>
               </div>
               <DragSlider value={soundEffects.stereoWidth ?? 0.5} onChange={(v) => setSoundEffect('stereoWidth', v)} min={0} max={1} />
@@ -532,19 +523,19 @@ export default function PlayerPage() {
 
             {/* Toggles */}
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setSoundEffect('spatialAudio', !soundEffects.spatialAudio)} className={`p-3 rounded-xl text-[12px] font-medium transition-all ${soundEffects.spatialAudio ? 'bg-[var(--accent)] text-white' : 'bg-white/[0.04] text-[var(--text-secondary)]'}`}>
+              <button onClick={() => setSoundEffect('spatialAudio', !soundEffects.spatialAudio)} className={`p-3 rounded-xl text-[12px] font-medium transition-all ${soundEffects.spatialAudio ? 'bg-[var(--accent)] text-white' : 'bg-black/[0.03] text-[var(--text-secondary)] border border-[var(--border-subtle)]'}`}>
                 Spatial Audio
               </button>
-              <button onClick={() => setSoundEffect('nightMode', !soundEffects.nightMode)} className={`p-3 rounded-xl text-[12px] font-medium transition-all ${soundEffects.nightMode ? 'bg-[var(--accent)] text-white' : 'bg-white/[0.04] text-[var(--text-secondary)]'}`}>
+              <button onClick={() => setSoundEffect('nightMode', !soundEffects.nightMode)} className={`p-3 rounded-xl text-[12px] font-medium transition-all ${soundEffects.nightMode ? 'bg-[var(--accent)] text-white' : 'bg-black/[0.03] text-[var(--text-secondary)] border border-[var(--border-subtle)]'}`}>
                 Night Mode
               </button>
             </div>
 
             {/* Crossfade */}
-            <div className="p-3 rounded-xl bg-white/[0.04]">
+            <div className="p-3 rounded-xl bg-black/[0.03]">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[12px] text-white font-medium">Crossfade</span>
-                <button onClick={toggleCrossfade} className={`w-10 h-6 rounded-full relative transition-all ${crossfade ? 'bg-[var(--accent)]' : 'bg-white/10'}`}>
+                <span className="text-[12px] text-[var(--text-primary)] font-medium">Crossfade</span>
+                <button onClick={toggleCrossfade} className={`w-10 h-6 rounded-full relative transition-all ${crossfade ? 'bg-[var(--accent)]' : 'bg-black/10'}`}>
                   <div className={`w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-all ${crossfade ? 'left-[18px]' : 'left-0.5'}`} />
                 </button>
               </div>
@@ -568,7 +559,7 @@ export default function PlayerPage() {
               <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 hide-scrollbar">
                 {Object.keys(EQ_PRESETS).map((name) => (
                   <button key={name} onClick={() => { setEqualizer('preset', Object.keys(EQ_PRESETS).indexOf(name)); setActiveEqPreset(name); }}
-                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${equalizer.preset === name ? 'bg-[var(--accent)] text-white' : 'bg-white/[0.06] text-[var(--text-tertiary)]'}`}>
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${equalizer.preset === name ? 'bg-[var(--accent)] text-white' : 'bg-black/[0.05] text-[var(--text-tertiary)]'}`}>
                     {name}
                   </button>
                 ))}
@@ -592,7 +583,7 @@ export default function PlayerPage() {
               <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-[0.15em] mb-2">Stream Quality</p>
               <div className="flex gap-2">
                 {(['low', 'mid', 'high'] as const).map(q => (
-                  <button key={q} onClick={() => setAudioQuality(q)} className={`flex-1 py-2 rounded-xl text-[11px] font-semibold transition-all ${audioQuality === q ? 'bg-[var(--accent)] text-white' : 'bg-white/[0.06] text-[var(--text-tertiary)]'}`}>
+                  <button key={q} onClick={() => setAudioQuality(q)} className={`flex-1 py-2 rounded-xl text-[11px] font-semibold transition-all ${audioQuality === q ? 'bg-[var(--accent)] text-white' : 'bg-black/[0.05] text-[var(--text-tertiary)]'}`}>
                     {q === 'low' ? 'Normal' : q === 'mid' ? 'High' : 'Lossless'}
                   </button>
                 ))}
@@ -607,7 +598,7 @@ export default function PlayerPage() {
               </div>
               <div className="flex gap-1.5">
                 {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map(s => (
-                  <button key={s} onClick={() => setPlaybackSpeed(s)} className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${playbackSpeed === s ? 'bg-[var(--accent)] text-white' : 'bg-white/[0.06] text-[var(--text-tertiary)]'}`}>{s}x</button>
+                  <button key={s} onClick={() => setPlaybackSpeed(s)} className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${playbackSpeed === s ? 'bg-[var(--accent)] text-white' : 'bg-black/[0.05] text-[var(--text-tertiary)]'}`}>{s}x</button>
                 ))}
               </div>
             </div>
@@ -618,7 +609,7 @@ export default function PlayerPage() {
               <div className="flex gap-1.5">
                 {[15, 30, 45, 60, 90].map(m => (
                   <button key={m} onClick={() => sleepTimer === m ? cancelSleepTimer() : startSleepTimer(m)}
-                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${sleepTimer === m ? 'bg-[var(--accent)] text-white' : 'bg-white/[0.06] text-[var(--text-tertiary)]'}`}>{m}m</button>
+                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${sleepTimer === m ? 'bg-[var(--accent)] text-white' : 'bg-black/[0.05] text-[var(--text-tertiary)]'}`}>{m}m</button>
                 ))}
               </div>
             </div>

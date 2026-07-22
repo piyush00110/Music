@@ -51,7 +51,6 @@ export default function Visualizer({ isPlaying, barCount = 48 }: Props) {
     if (isPlaying) {
       draw();
     } else {
-      // Draw one static frame when paused
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const barWidth = canvas.width / barCount;
       const gap = 1;

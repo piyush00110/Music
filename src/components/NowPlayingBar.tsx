@@ -20,9 +20,9 @@ export default function NowPlayingBar() {
             e.preventDefault();
           }
         }}>
-        <div className="glass-panel rounded-xl mx-1 overflow-hidden">
+        <div className="glass-panel rounded-xl mx-1 overflow-hidden shadow-sm border border-[var(--border-subtle)]">
           {/* Progress indicator */}
-          <div className="h-[2px] w-full bg-white/[0.08]">
+          <div className="h-[2px] w-full bg-black/[0.06]">
             <div
               className="h-full bg-[var(--accent)] transition-all duration-300"
               style={{ width: `${duration > 0 ? (progress / duration) * 100 : 0}%` }}
@@ -31,12 +31,12 @@ export default function NowPlayingBar() {
 
           <div className="flex items-center gap-3 px-3 py-2.5">
             {/* Album art */}
-            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
+            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--bg-surface)]">
               {artSrc ? (
                 <img src={artSrc} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="material-symbols-outlined text-zinc-600 text-sm">music_note</span>
+                  <span className="material-symbols-outlined text-[var(--text-tertiary)] text-sm">music_note</span>
                 </div>
               )}
             </div>
@@ -70,19 +70,19 @@ export default function NowPlayingBar() {
       </Link>
 
       {/* Desktop bar */}
-      <Link href="/player" className="hidden md:flex items-center gap-4 px-6 py-2 glass-panel max-w-screen-2xl mx-auto"
+      <Link href="/player" className="hidden md:flex items-center gap-4 px-6 py-2 glass-panel border-t border-[var(--border-subtle)] max-w-screen-2xl mx-auto"
         onClick={(e) => {
           if ((e.target as HTMLElement).closest('button')) {
             e.preventDefault();
           }
         }}>
         <div className="flex items-center gap-3 min-w-0 w-72">
-          <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
+          <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--bg-surface)]">
             {artSrc ? (
               <img src={artSrc} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <span className="material-symbols-outlined text-zinc-600">music_note</span>
+                <span className="material-symbols-outlined text-[var(--text-tertiary)]">music_note</span>
               </div>
             )}
           </div>
@@ -100,8 +100,8 @@ export default function NowPlayingBar() {
             <span className="material-symbols-outlined text-xl">skip_previous</span>
           </button>
           <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); isPlaying ? pause() : resume(); }}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--text-primary)] active:scale-95 transition-all">
-            <span className="material-symbols-outlined text-2xl text-black" style={{ fontVariationSettings: "'FILL' 1" }}>
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--text-primary)] active:scale-95 transition-all shadow-sm">
+            <span className="material-symbols-outlined text-2xl text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
               {isPlaying ? 'pause' : 'play_arrow'}
             </span>
           </button>
@@ -115,7 +115,7 @@ export default function NowPlayingBar() {
           <span className="text-[11px] text-[var(--text-tertiary)] w-8 text-right tabular-nums">
             {Math.floor(progress / 60)}:{Math.floor(progress % 60).toString().padStart(2, '0')}
           </span>
-          <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+          <div className="flex-1 h-1 bg-black/10 rounded-full overflow-hidden">
             <div
               className="h-full bg-[var(--text-primary)] rounded-full transition-all duration-300"
               style={{ width: `${duration > 0 ? (progress / duration) * 100 : 0}%` }}

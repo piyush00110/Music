@@ -23,7 +23,7 @@ export default function Equalizer() {
   return (
     <div className="glass-panel rounded-2xl p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-[family-name:var(--font-serif)] text-white uppercase tracking-wider">Equalizer</h3>
+        <h3 className="text-sm font-[family-name:var(--font-serif)] text-[var(--text-primary)] uppercase tracking-wider">Equalizer</h3>
         <div className="flex items-center gap-2">
           {(['normal', 'headphone', 'speaker'] as const).map(mode => (
             <button
@@ -32,10 +32,10 @@ export default function Equalizer() {
               className={`px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider transition-all ${
                 equalizer.mode === mode
                   ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/40'
-                  : 'text-zinc-500 border border-white/5 hover:border-[var(--accent)]/20 hover:text-zinc-300'
+                  : 'text-[var(--text-tertiary)] border border-[var(--border-subtle)] hover:border-[var(--accent)]/20 hover:text-[var(--text-secondary)]'
               }`}
             >
-              {mode === 'normal' ? 'Normal' : mode === 'headphone' ? '🎧 Headphone' : '🔊 Speaker'}
+              {mode === 'normal' ? 'Normal' : mode === 'headphone' ? 'Headphone' : 'Speaker'}
             </button>
           ))}
         </div>
@@ -50,7 +50,7 @@ export default function Equalizer() {
             className={`px-3 py-1 rounded-full text-[10px] transition-all ${
               equalizer.preset === p
                 ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/40'
-                : 'text-zinc-500 border border-white/5 hover:border-[var(--accent)]/20 hover:text-zinc-300'
+                : 'text-[var(--text-tertiary)] border border-[var(--border-subtle)] hover:border-[var(--accent)]/20 hover:text-[var(--text-secondary)]'
             }`}
           >
             {p}
@@ -65,8 +65,8 @@ export default function Equalizer() {
           const pct = ((val + 24) / 48) * 100;
           return (
             <div key={band.key} className="flex-1 flex flex-col items-center gap-1 h-full">
-              <span className="text-[9px] text-zinc-500 font-mono">{val > 0 ? `+${val}` : val}</span>
-              <div className="relative flex-1 w-full bg-white/[0.03] rounded-full overflow-hidden cursor-pointer"
+              <span className="text-[9px] text-[var(--text-tertiary)] font-mono">{val > 0 ? `+${val}` : val}</span>
+              <div className="relative flex-1 w-full bg-black/[0.04] rounded-full overflow-hidden cursor-pointer"
                 onClick={(e) => {
                   const r = e.currentTarget.getBoundingClientRect();
                   const y = e.clientY - r.top;
@@ -83,7 +83,6 @@ export default function Equalizer() {
                       : 'linear-gradient(to top, rgba(252,60,68,0.3), rgba(252,60,68,0.1))',
                   }}
                 />
-                {/* Frequency response curve overlay */}
                 {i < BANDS.length - 1 && (() => {
                   const nextVal = (equalizer as any)[BANDS[i + 1].key] || 0;
                   const nextPct = ((nextVal + 24) / 48) * 100;
@@ -99,7 +98,7 @@ export default function Equalizer() {
                   );
                 })()}
               </div>
-              <span className="text-[9px] text-zinc-600">{band.label}</span>
+              <span className="text-[9px] text-[var(--text-tertiary)]">{band.label}</span>
             </div>
           );
         })}

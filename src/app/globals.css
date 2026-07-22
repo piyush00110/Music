@@ -1,40 +1,13 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #000000;
-  --color-foreground: #ffffff;
+  --color-background: #ffffff;
+  --color-foreground: #000000;
   --font-sans: 'Inter', var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   --font-serif: 'Playfair Display', var(--font-geist-serif), Georgia, serif;
 }
 
 :root {
-  --bg-primary: #000000;
-  --bg-secondary: #0c0c0c;
-  --bg-surface: #1c1c1e;
-  --bg-surface-hover: #2c2c2e;
-  --bg-elevated: #1c1c1e;
-  --bg-glass: rgba(28, 28, 30, 0.72);
-  --bg-glass-hover: rgba(44, 44, 46, 0.8);
-  --text-primary: #ffffff;
-  --text-secondary: #a1a1a6;
-  --text-tertiary: #636366;
-  --text-inverse: #000000;
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-medium: rgba(255, 255, 255, 0.14);
-  --accent: #fc3c44;
-  --accent-hover: #ff5a5f;
-  --accent-pink: #ff2d55;
-  --accent-blue: #0a84ff;
-  --accent-green: #30d158;
-  --accent-orange: #ff9f0a;
-  --accent-purple: #bf5af2;
-  --accent-teal: #64d2ff;
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.7);
-}
-
-.light {
   --bg-primary: #f2f2f7;
   --bg-secondary: #ffffff;
   --bg-surface: #ffffff;
@@ -46,8 +19,19 @@
   --text-secondary: #636366;
   --text-tertiary: #aeaeb2;
   --text-inverse: #ffffff;
-  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.06);
   --border-medium: rgba(0, 0, 0, 0.12);
+  --accent: #fc3c44;
+  --accent-hover: #ff5a5f;
+  --accent-pink: #ff2d55;
+  --accent-blue: #0a84ff;
+  --accent-green: #30d158;
+  --accent-orange: #ff9f0a;
+  --accent-purple: #bf5af2;
+  --accent-teal: #64d2ff;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
 }
 
 * {
@@ -57,6 +41,7 @@
 *::-webkit-scrollbar { display: none; }
 
 html {
+  background: #f2f2f7;
   transition: background-color 0.4s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -95,31 +80,26 @@ body {
 }
 
 .glass-btn {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.05);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: none;
   border-radius: 980px;
   transition: all 0.15s ease;
 }
-.glass-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.glass-btn:hover { background: rgba(0, 0, 0, 0.08); }
 .glass-btn:active { transform: scale(0.95); }
-.light .glass-btn { background: rgba(0, 0, 0, 0.05); }
-.light .glass-btn:hover { background: rgba(0, 0, 0, 0.08); }
 
 .frosted-obsidian {
-  background: rgba(18, 18, 18, 0.85);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(50px) saturate(180%);
   -webkit-backdrop-filter: blur(50px) saturate(180%);
   border-top: 0.5px solid var(--border-subtle);
 }
-.light .frosted-obsidian {
-  background: rgba(255, 255, 255, 0.85);
-}
 
 /* ═══ ACTIVE TRACK ═══ */
 .active-track-glow {
-  background: rgba(252, 60, 68, 0.08);
+  background: rgba(252, 60, 68, 0.06);
   border-left: 2.5px solid var(--accent);
 }
 
@@ -135,7 +115,7 @@ body {
 
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 .shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+  background: linear-gradient(90deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.02) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
@@ -234,7 +214,7 @@ body {
 
 /* ═══ ARTIST CIRCLE ═══ */
 .artist-circle { transition: transform 0.3s ease, box-shadow 0.3s ease; }
-.artist-circle:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); }
+.artist-circle:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12); }
 
 /* ═══ HORIZONTAL SCROLL ═══ */
 .scroll-smooth-x {
@@ -252,11 +232,12 @@ body {
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0.3;
   transform: scale(0.96);
+  color: var(--text-primary);
 }
 .lyrics-line.active {
   opacity: 1;
   transform: scale(1);
-  color: #ffffff;
+  color: var(--accent);
   font-weight: 700;
 }
 .lyrics-line.past {

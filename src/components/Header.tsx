@@ -13,7 +13,7 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
-      <div className="glass-panel">
+      <div className="glass-panel border-b border-[var(--border-subtle)]">
         <div className="flex items-center justify-between px-5 md:px-8 h-12">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2">
@@ -25,7 +25,7 @@ export default function Header() {
 
           <div className="flex items-center gap-2">
             <Link href="/search"
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/5">
               <span className="material-symbols-outlined text-[20px]">search</span>
             </Link>
           </div>

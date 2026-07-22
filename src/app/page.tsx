@@ -30,7 +30,7 @@ function QuickPicksGrid({ tracks, play }: { tracks: Track[]; play: (t: Track, q:
         <button
           key={`quick-${track.id}`}
           onClick={() => play(track, tracks)}
-          className="flex items-center gap-3 bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] rounded-xl overflow-hidden transition-all active:scale-[0.98] group text-left"
+          className="flex items-center gap-3 bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] rounded-xl overflow-hidden transition-all active:scale-[0.98] group text-left shadow-sm border border-[var(--border-subtle)]"
         >
           <div className="w-14 h-14 flex-shrink-0 relative overflow-hidden rounded-l-xl">
             {(track.album.cover_medium || track.youtubeId) ? (
@@ -41,8 +41,8 @@ function QuickPicksGrid({ tracks, play }: { tracks: Track[]; play: (t: Track, q:
                 loading="lazy"
               />
             ) : (
-              <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-                <span className="material-symbols-outlined text-zinc-600 text-lg">music_note</span>
+              <div className="w-full h-full bg-[var(--bg-surface-hover)] flex items-center justify-center">
+                <span className="material-symbols-outlined text-[var(--text-tertiary)] text-lg">music_note</span>
               </div>
             )}
           </div>
@@ -50,7 +50,7 @@ function QuickPicksGrid({ tracks, play }: { tracks: Track[]; play: (t: Track, q:
             <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{track.title}</p>
             <p className="text-[11px] text-[var(--text-secondary)] truncate">{track.artist.name}</p>
           </div>
-          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 mr-3 transition-all">
+          <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 mr-3 transition-all">
             <span className="material-symbols-outlined text-[var(--accent)] text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
           </div>
         </button>
@@ -123,7 +123,7 @@ export default function HomePage() {
               <div
                 key={`recent-${track.id}`}
                 onClick={() => play(track, recentTracks)}
-                className="flex-shrink-0 w-[140px] md:w-[160px] rounded-xl overflow-hidden bg-[var(--bg-surface)] cursor-pointer group playlist-card"
+                className="flex-shrink-0 w-[140px] md:w-[160px] rounded-xl overflow-hidden bg-[var(--bg-surface)] cursor-pointer group playlist-card shadow-sm border border-[var(--border-subtle)]"
               >
                 <div className="relative w-full aspect-square overflow-hidden">
                   {(track.album.cover_medium || track.youtubeId) ? (
@@ -134,8 +134,8 @@ export default function HomePage() {
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-zinc-600 text-3xl">music_note</span>
+                    <div className="w-full h-full bg-[var(--bg-surface-hover)] flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[var(--text-tertiary)] text-3xl">music_note</span>
                     </div>
                   )}
                   <button
@@ -165,7 +165,7 @@ export default function HomePage() {
             <div
               key={playlist.id}
               onClick={() => router.push(`/search?q=${encodeURIComponent(playlist.title)}`)}
-              className="flex-shrink-0 w-[160px] md:w-[180px] rounded-xl overflow-hidden bg-[var(--bg-surface)] cursor-pointer group playlist-card"
+              className="flex-shrink-0 w-[160px] md:w-[180px] rounded-xl overflow-hidden bg-[var(--bg-surface)] cursor-pointer group playlist-card shadow-sm border border-[var(--border-subtle)]"
             >
               <div className={`relative w-full aspect-square bg-gradient-to-br ${playlist.gradient} overflow-hidden`}>
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -198,7 +198,7 @@ export default function HomePage() {
               key={mood.id}
               href={`/search?q=${encodeURIComponent(mood.query)}`}
               onClick={(e) => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(mood.query)}`); }}
-              className={`flex-shrink-0 w-[110px] md:w-[130px] h-[130px] md:h-[140px] rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${mood.color} border border-white/[0.06] hover:border-white/[0.15] transition-all active:scale-[0.97] card-hover`}
+              className={`flex-shrink-0 w-[110px] md:w-[130px] h-[130px] md:h-[140px] rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${mood.color} border border-black/[0.06] hover:border-black/[0.12] transition-all active:scale-[0.97] card-hover`}
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
               <div className="absolute top-3 left-3 text-2xl">{mood.icon}</div>
@@ -223,7 +223,7 @@ export default function HomePage() {
               onClick={(e) => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(artist.name)}`); }}
               className="flex-shrink-0 flex flex-col items-center gap-2 group cursor-pointer"
             >
-              <div className="relative w-[80px] h-[80px] md:w-[100px] md:h-[100px] rounded-full overflow-hidden artist-circle shadow-lg bg-zinc-800">
+              <div className="relative w-[80px] h-[80px] md:w-[100px] md:h-[100px] rounded-full overflow-hidden artist-circle shadow-md bg-[var(--bg-surface)]">
                 <img
                   src={artist.image}
                   alt={artist.name}
@@ -233,7 +233,7 @@ export default function HomePage() {
                     const img = e.target as HTMLImageElement;
                     if (img.dataset.fallback) return;
                     img.dataset.fallback = '1';
-                    img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" fill="#2c2c2e"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="#fc3c44" font-size="32" font-weight="bold" font-family="sans-serif">${artist.name.charAt(0)}</text></svg>`)}`;
+                    img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" fill="#f2f2f7"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="#fc3c44" font-size="32" font-weight="bold" font-family="sans-serif">${artist.name.charAt(0)}</text></svg>`)}`;
                   }}
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
@@ -260,7 +260,7 @@ export default function HomePage() {
               key={genre.id}
               href={`/search?q=${genre.name}`}
               onClick={(e) => { e.preventDefault(); router.push(`/search?q=${genre.name}`); }}
-              className={`h-[80px] md:h-[100px] rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${GENRE_COLORS[genre.name] || 'from-zinc-700 to-zinc-800'} border border-white/[0.06] hover:border-white/[0.15] transition-all active:scale-[0.97] card-hover`}
+              className={`h-[80px] md:h-[100px] rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${GENRE_COLORS[genre.name] || 'from-zinc-300 to-zinc-400'} border border-black/[0.06] hover:border-black/[0.12] transition-all active:scale-[0.97] card-hover`}
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
               <div className="absolute bottom-3 left-3 right-3">

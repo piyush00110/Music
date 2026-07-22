@@ -16,7 +16,7 @@ export default function BottomNav() {
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
-      <div className="frosted-obsidian">
+      <div className="frosted-obsidian border-t border-[var(--border-subtle)]">
         <div className="flex items-center justify-around px-2 py-1.5">
           {NAV_ITEMS.map(({ href, label, icon }) => {
             const active = path === href;
