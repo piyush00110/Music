@@ -36,9 +36,9 @@ export default function Visualizer({ isPlaying, barCount = 48 }: Props) {
         const w = barWidth - gap;
 
         const gradient = ctx.createLinearGradient(x, canvas.height - h, x, canvas.height);
-        gradient.addColorStop(0, '#D4AF37');
-        gradient.addColorStop(0.5, '#FFBF00');
-        gradient.addColorStop(1, '#D4AF37');
+        gradient.addColorStop(0, '#fc3c44');
+        gradient.addColorStop(0.5, '#ff5a5f');
+        gradient.addColorStop(1, '#fc3c44');
 
         ctx.fillStyle = gradient;
         ctx.globalAlpha = 0.4 + bars[i] * 0.6;
@@ -59,7 +59,7 @@ export default function Visualizer({ isPlaying, barCount = 48 }: Props) {
         const h = bars[i] * canvas.height * 0.2;
         const x = i * barWidth + gap / 2;
         const w = barWidth - gap;
-        ctx.fillStyle = '#D4AF37';
+        ctx.fillStyle = '#fc3c44';
         ctx.globalAlpha = 0.2;
         ctx.fillRect(x, canvas.height - h, w, h);
       }

@@ -3,7 +3,7 @@
 import { createContext, useContext, useRef, useState, useCallback, useEffect, useMemo, memo, type ReactNode } from 'react';
 import type { Track, PlayerState } from './types';
 import { findOnYouTube } from './music';
-import { downloadFile, getTrackDownloadUrl, getSafeFilename } from './download';
+import { downloadFile, getTrackDownloadUrl, getSafeFilename, saveToStorage, showToast } from './download';
 
 interface PlayerContextType extends PlayerState {
   play: (track: Track, queue?: Track[]) => void;
@@ -19,6 +19,7 @@ interface PlayerContextType extends PlayerState {
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
   downloadCurrentTrack: () => Promise<void>;
+  saveTrackToLibrary: (track: Track) => Promise<string | null>;
   downloading: boolean;
   audioError: string | null;
   setAudioQuality: (q: string) => void;
@@ -76,7 +77,7 @@ function defaultState(): PlayerState {
     volume: s.volume ?? 0.7, progress: 0, duration: 0,
     shuffle: s.shuffle ?? false, repeat: s.repeat ?? 'off',
     recentlyPlayed: [],
-    playbackSpeed: 1, crossfade: s.crossfade ?? true,
+    playbackSpeed: s.playbackSpeed ?? 1, crossfade: s.crossfade ?? true,
     crossfadeDuration: s.crossfadeDuration ?? 3,
     showEqualizer: false, showSoundEffects: false, nowPlayingView: 'artwork',
     audioQuality: s.audioQuality || 'high', downloadFormat: 'mp3',
@@ -164,6 +165,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [state, setState] = useState<PlayerState>(defaultState);
   const [audioError, setAudioError] = useState<string | null>(null);
   sRef.current = state;
@@ -522,11 +524,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // ── Spectrum visualizer: throttled to 15fps, only when playing ──
   useEffect(() => {
     let raf: number;
+    let running = true;
     let lastUpdate = 0;
-    const FRAME_INTERVAL = 1000 / 15; // 15fps (was 60fps — causes massive lag)
+    const FRAME_INTERVAL = 1000 / 15;
     const update = (timestamp: number) => {
-      raf = requestAnimationFrame(update);
-      if (timestamp - lastUpdate < FRAME_INTERVAL) return;
+      if (!running) return;
+      if (timestamp - lastUpdate < FRAME_INTERVAL) {
+        raf = requestAnimationFrame(update);
+        return;
+      }
       lastUpdate = timestamp;
       const analyser = analyserRef.current;
       if (analyser && sRef.current.isPlaying) {
@@ -550,7 +556,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       raf = requestAnimationFrame(update);
     };
     raf = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(raf);
+    return () => { running = false; cancelAnimationFrame(raf); };
   }, []);
 
   // ── Init: YouTube API + audio element ──────────────────────
@@ -634,6 +640,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       au.src = '';
       ctxRef.current?.close();
       releaseWakeLock();
+      if (pendingPlayTimeoutRef.current) { clearTimeout(pendingPlayTimeoutRef.current); pendingPlayTimeoutRef.current = null; }
+      if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
+      if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
     };
   }, []);
 
@@ -671,14 +680,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(LS_KEY, JSON.stringify({
           volume, shuffle: s.shuffle, repeat: s.repeat,
           audioQuality: s.audioQuality, crossfade: s.crossfade,
-          crossfadeDuration: s.crossfadeDuration,
+          crossfadeDuration: s.crossfadeDuration, playbackSpeed: s.playbackSpeed,
           equalizer: { ...s.equalizer }, soundEffects: { ...s.soundEffects },
           recentlyPlayed: s.recentlyPlayed,
         }));
       } catch {}
     }, 500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [volume, state.shuffle, state.repeat, state.audioQuality, state.crossfade, state.crossfadeDuration]);
+  }, [volume, state.shuffle, state.repeat, state.audioQuality, state.crossfade, state.crossfadeDuration, state.playbackSpeed, state.equalizer, state.soundEffects]);
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -775,14 +784,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return new Promise(resolve => {
       const au = audioRef.current;
       if (!au || !streamingRef.current) { resolve(); return; }
+      // Clear any existing fade interval
+      if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
       const currentVol = sRef.current.volume;
       const steps = 20;
       const stepTime = (duration * 1000) / steps;
       let step = 0;
-      const fade = setInterval(() => {
+      fadeIntervalRef.current = setInterval(() => {
         step++;
         if (step >= steps) {
-          clearInterval(fade);
+          if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
           au.volume = 0;
           au.pause();
           au.volume = currentVol;
@@ -799,24 +810,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     try {
       const found = await findOnYouTube(track.title, track.artist.name);
       if (found) {
-        track.youtubeId = found;
+        const updatedTrack = { ...track, youtubeId: found };
         // Try stream API
         try {
           const res = await fetch(`/api/stream?id=${found}`);
-          const data = await res.json();
-          if (data.url && !data.fallback) {
-            streamingRef.current = true;
-            const au = audioRef.current;
-            if (au) {
-              au.src = data.url;
-              au.volume = sRef.current.volume;
-              au.onerror = null;
-              ensureAudioContext();
-              au.onended = () => { streamingRef.current = false; onEnded(); };
-              await au.play();
-              startAutoGainAnalysis();
-              setState(s => ({ ...s, currentTrack: track }));
-              return;
+          if (res.ok) {
+            const data = await res.json();
+            if (data.url && !data.fallback) {
+              streamingRef.current = true;
+              const au = audioRef.current;
+              if (au) {
+                au.src = data.url;
+                au.volume = sRef.current.volume;
+                au.onerror = null;
+                ensureAudioContext();
+                au.onended = () => { streamingRef.current = false; onEnded(); };
+                try {
+                  await au.play();
+                  setState(s => ({ ...s, currentTrack: updatedTrack, isPlaying: true }));
+                  startAutoGainAnalysis();
+                  return;
+                } catch {
+                  streamingRef.current = false;
+                }
+              }
             }
           }
         } catch {}
@@ -827,12 +844,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             ytPlayerRef.current.stopVideo();
             ytPlayerRef.current.loadVideoById(found, 0, 'default');
             audioRef.current!.src = '';
-            setState(s => ({ ...s, currentTrack: track }));
+            setState(s => ({ ...s, currentTrack: updatedTrack, isPlaying: true }));
             return;
           } catch {}
         }
         pendingPlayRef.current = found;
-        setState(s => ({ ...s, currentTrack: track }));
+        setState(s => ({ ...s, currentTrack: updatedTrack }));
         return;
       }
     } catch {}
@@ -846,6 +863,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     requestWakeLock();
     if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
     if (pendingPlayTimeoutRef.current) { clearTimeout(pendingPlayTimeoutRef.current); pendingPlayTimeoutRef.current = null; }
+    if (fadeIntervalRef.current) { clearInterval(fadeIntervalRef.current); fadeIntervalRef.current = null; }
 
     // ── STOP old playback FIRST to prevent "plays old song" bug ──
     if (streamingRef.current) {
@@ -865,30 +883,57 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const rp = s.recentlyPlayed.filter(t => t.id !== track.id);
       rp.unshift(track);
       if (rp.length > 50) rp.length = 50;
-      return { ...s, currentTrack: track, isPlaying: true, queue, queueIndex: idx >= 0 ? idx : 0, progress: 0, duration: 0, recentlyPlayed: rp };
+      return { ...s, currentTrack: track, queue, queueIndex: idx >= 0 ? idx : 0, progress: 0, duration: 0, recentlyPlayed: rp };
     });
     updateMediaSession(track);
     applyEQ();
     applySoundEffects();
 
-    // ── YouTube track: try stream first (gets audio through our effects chain), fallback to IFrame ──
+    // ── YouTube track: try stored URL first, then stream API, then IFrame ──
     if (track.youtubeId) {
-      // Try stream API first for full audio processing through our chain
+      // Priority 1: If track has a stored URL from Supabase Storage, play it directly
+      if (track.storedUrl) {
+        streamingRef.current = true;
+        const au = audioRef.current;
+        if (au) {
+          au.src = track.storedUrl;
+          au.volume = sRef.current.volume;
+          ensureAudioContext();
+          au.onended = () => { streamingRef.current = false; onEnded(); };
+          try {
+            await au.play();
+            setState(s => ({ ...s, isPlaying: true }));
+            startAutoGainAnalysis();
+            return;
+          } catch {
+            streamingRef.current = false;
+          }
+        }
+      }
+
+      // Priority 2: Try stream API (gets audio through our effects chain)
       streamingRef.current = false;
       try {
         const res = await fetch(`/api/stream?id=${track.youtubeId}`);
-        const data = await res.json();
-        if (data.url && !data.fallback) {
-          streamingRef.current = true;
-          const au = audioRef.current;
-          if (au) {
-            au.src = data.url;
-            au.volume = sRef.current.volume;
-            ensureAudioContext();
-            au.onended = () => { streamingRef.current = false; onEnded(); };
-            await au.play();
-            startAutoGainAnalysis();
-            return;
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url && !data.fallback) {
+            streamingRef.current = true;
+            const au = audioRef.current;
+            if (au) {
+              au.src = data.url;
+              au.volume = sRef.current.volume;
+              ensureAudioContext();
+              au.onended = () => { streamingRef.current = false; onEnded(); };
+              try {
+                await au.play();
+                setState(s => ({ ...s, isPlaying: true }));
+                startAutoGainAnalysis();
+                return;
+              } catch {
+                streamingRef.current = false;
+              }
+            }
           }
         }
       } catch {}
@@ -900,6 +945,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           ytPlayerRef.current.stopVideo();
           ytPlayerRef.current.loadVideoById(track.youtubeId, 0, 'default');
           audioRef.current!.src = '';
+          setState(s => ({ ...s, isPlaying: true }));
           if (state.audioQuality === 'high') ytPlayerRef.current.setPlaybackQuality('hd1080');
           else if (state.audioQuality === 'mid') ytPlayerRef.current.setPlaybackQuality('hd720');
           else ytPlayerRef.current.setPlaybackQuality('medium');
@@ -933,17 +979,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       au.volume = sRef.current.volume;
       ensureAudioContext();
       au.onended = () => { streamingRef.current = false; onEnded(); };
+      let fallbackAttempted = false;
       au.onerror = () => {
-        // CORS or network error — try YouTube search as fallback
+        if (fallbackAttempted) return;
+        fallbackAttempted = true;
         streamingRef.current = false;
         fallbackToYouTube(track, queue);
       };
       try {
         await au.play();
+        setState(s => ({ ...s, isPlaying: true }));
         startAutoGainAnalysis();
         return;
       } catch {
-        // Playback failed — try YouTube search as fallback
+        if (fallbackAttempted) return;
+        fallbackAttempted = true;
         streamingRef.current = false;
       }
     }
@@ -1036,7 +1086,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const addToQueue = useCallback((t: Track) => setState(s => ({ ...s, queue: [...s.queue, t] })), []);
   const removeFromQueue = useCallback((i: number) => setState(s => {
     const q = s.queue.filter((_, idx) => idx !== i);
-    return { ...s, queue: q, queueIndex: i < s.queueIndex ? s.queueIndex - 1 : s.queueIndex === i ? -1 : s.queueIndex };
+    if (s.queueIndex === i) {
+      // Removing the currently playing track - play next or stop
+      if (q.length === 0) {
+        return { ...s, queue: [], queueIndex: -1, isPlaying: false };
+      }
+      const nextIdx = i >= q.length ? 0 : i;
+      return { ...s, queue: q, queueIndex: nextIdx };
+    }
+    return { ...s, queue: q, queueIndex: i < s.queueIndex ? s.queueIndex - 1 : s.queueIndex };
   }), []);
   const clearQueue = useCallback(() => setState(s => ({ ...s, queue: [], queueIndex: -1 })), []);
 
@@ -1044,11 +1102,34 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const t = sRef.current.currentTrack;
     if (!t) return;
     setDownloading(true);
-    const url = getTrackDownloadUrl(t);
-    if (url) {
-      const ext = t.youtubeId ? 'm4a' : (t.preview?.includes('mp4') ? 'm4a' : 'mp3');
-      const filename = getSafeFilename(t.title, ext);
-      await downloadFile(url, filename);
+    try {
+      // Save to Supabase Storage first
+      const storageUrl = await saveToStorage(t);
+      if (storageUrl) {
+        // Update track's stored URL so it can play from storage next time
+        setState(s => {
+          const updatedTrack = s.currentTrack?.id === t.id ? { ...s.currentTrack, storedUrl: storageUrl } : s.currentTrack;
+          const updatedQueue = s.queue.map(qt => qt.id === t.id ? { ...qt, storedUrl: storageUrl } : qt);
+          const updatedRecent = s.recentlyPlayed.map(rt => rt.id === t.id ? { ...rt, storedUrl: storageUrl } : rt);
+          return { ...s, currentTrack: updatedTrack, queue: updatedQueue, recentlyPlayed: updatedRecent };
+        });
+        showToast('Saved to your library!', 'success');
+      }
+      // Also download locally
+      const url = getTrackDownloadUrl(t);
+      if (url) {
+        const ext = t.youtubeId ? 'm4a' : (t.preview?.includes('mp4') ? 'm4a' : 'mp3');
+        const filename = getSafeFilename(t.title, ext);
+        await downloadFile(url, filename);
+      }
+    } catch {
+      // Fallback: just download locally
+      const url = getTrackDownloadUrl(t);
+      if (url) {
+        const ext = t.youtubeId ? 'm4a' : (t.preview?.includes('mp4') ? 'm4a' : 'mp3');
+        const filename = getSafeFilename(t.title, ext);
+        await downloadFile(url, filename);
+      }
     }
     setDownloading(false);
   }, []);
@@ -1102,6 +1183,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return favoritesRef.current.has(trackId);
   }, []);
 
+  const saveTrackToLibrary = useCallback(async (track: Track): Promise<string | null> => {
+    if (!track.youtubeId) return null;
+    showToast('Saving to library...', 'success');
+    const url = await saveToStorage(track);
+    if (url) {
+      // Update track's stored URL in state (immutable)
+      setState(s => {
+        const updatedTrack = s.currentTrack?.id === track.id ? { ...s.currentTrack, storedUrl: url } : s.currentTrack;
+        const updatedQueue = s.queue.map(qt => qt.id === track.id ? { ...qt, storedUrl: url } : qt);
+        const updatedRecent = s.recentlyPlayed.map(rt => rt.id === track.id ? { ...rt, storedUrl: url } : rt);
+        return { ...s, currentTrack: updatedTrack, queue: updatedQueue, recentlyPlayed: updatedRecent };
+      });
+      showToast('Saved to your library!', 'success');
+    } else {
+      showToast('Failed to save to library', 'error');
+    }
+    return url;
+  }, []);
+
   const setPlaybackSpeed = useCallback((speed: number) => {
     const clamped = Math.max(0.5, Math.min(2.0, speed));
     setState(s => ({ ...s, playbackSpeed: clamped }));
@@ -1113,14 +1213,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     ...state, audioError, downloading, liveSpectrum, loudnessDb,
     play, pause, resume, next, prev, setVolume, seek,
     toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue,
-    downloadCurrentTrack, setAudioQuality, setEqualizer, setSoundEffect,
+    downloadCurrentTrack, saveTrackToLibrary, setAudioQuality, setEqualizer, setSoundEffect,
     toggleCrossfade, setCrossfadeDuration, setPlaybackSpeed,
     toggleFavorite, isFavorite,
     audioContext: ctxRef.current,
     eqFilters: eqRefs.current,
     masterGain: masterGainRef.current,
     analyserNode: analyserRef.current,
-  }), [state, audioError, downloading, liveSpectrum, loudnessDb, play, pause, resume, next, prev, setVolume, seek, toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue, downloadCurrentTrack, setAudioQuality, setEqualizer, setSoundEffect, toggleCrossfade, setCrossfadeDuration, setPlaybackSpeed, toggleFavorite, isFavorite]);
+  }), [state, audioError, downloading, liveSpectrum, loudnessDb, play, pause, resume, next, prev, setVolume, seek, toggleShuffle, toggleRepeat, addToQueue, removeFromQueue, clearQueue, downloadCurrentTrack, saveTrackToLibrary, setAudioQuality, setEqualizer, setSoundEffect, toggleCrossfade, setCrossfadeDuration, setPlaybackSpeed, toggleFavorite, isFavorite]);
 
   return (
     <PlayerContext.Provider value={contextValue}>

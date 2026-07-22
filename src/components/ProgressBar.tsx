@@ -28,11 +28,11 @@ export default function ProgressBar({ value, max, onChange, className = '' }: Pr
       className={`relative h-1.5 rounded-full bg-white/10 cursor-pointer group ${className}`}
     >
       <div
-        className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-[#D4AF37] to-[#FFBF00] transition-all duration-100"
+        className="absolute left-0 top-0 h-full rounded-full bg-[var(--accent)] transition-all duration-100"
         style={{ width: `${pct}%` }}
       />
       <div
-        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-[#D4AF37] shadow-lg shadow-[#D4AF37]/40 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-[var(--accent)] shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
         style={{ left: `calc(${pct}% - 6px)` }}
       />
     </div>

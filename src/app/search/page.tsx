@@ -8,6 +8,15 @@ import { usePlayer } from '@/lib/PlayerContext';
 import { useSearch } from '@/lib/SearchContext';
 import { useSearchParams } from 'next/navigation';
 
+const CATEGORIES = [
+  { label: 'Charts', icon: 'trending_up', color: '#fc3c44' },
+  { label: 'Moods', icon: 'mood', color: '#ff2d55' },
+  { label: 'Genres', icon: 'library_music', color: '#0a84ff' },
+  { label: 'New', icon: 'new_releases', color: '#30d158' },
+  { label: 'Videos', icon: 'play_circle', color: '#ff9f0a' },
+  { label: 'Live Radio', icon: 'radio', color: '#bf5af2' },
+];
+
 const TRENDING_SEARCHES = [
   'Taylor Swift', 'Drake', 'The Weeknd', 'Billie Eilish', 'Bad Bunny',
   'Dua Lipa', 'Ed Sheeran', 'Post Malone', 'SZA', 'Doja Cat',
@@ -26,13 +35,13 @@ function SearchContent() {
   const [error, setError] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const restored = useRef(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  // Restore state
   useEffect(() => {
     if (initialQ) {
       setQuery(initialQ);
@@ -50,7 +59,6 @@ function SearchContent() {
     }
   }, []);
 
-  // Close suggestions on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
@@ -61,7 +69,6 @@ function SearchContent() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Debounced suggest fetch
   useEffect(() => {
     if (!query.trim() || query.length < 2 || restored.current) {
       setSuggestions([]);
@@ -80,7 +87,6 @@ function SearchContent() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
 
-  // Search
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) return;
     setLoading(true);
@@ -113,11 +119,11 @@ function SearchContent() {
   }, [query, doSearch]);
 
   return (
-    <div className="px-4 md:px-8 lg:px-12 py-6 max-w-screen-xl mx-auto slide-up">
+    <div className="px-4 md:px-8 lg:px-12 py-4 max-w-screen-xl mx-auto slide-up">
       {/* Search Input */}
-      <div className="relative mb-6 max-w-2xl mx-auto" ref={suggestionsRef}>
-        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-          <span className="material-symbols-outlined text-zinc-500 text-[20px]">search</span>
+      <div className="relative mb-5 max-w-2xl mx-auto" ref={suggestionsRef}>
+        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+          <span className="material-symbols-outlined text-[var(--text-tertiary)] text-[20px]">search</span>
         </div>
         <input
           ref={inputRef}
@@ -128,65 +134,82 @@ function SearchContent() {
             restored.current = false;
             setShowSuggestions(true);
           }}
-          onFocus={() => query.length >= 2 && setShowSuggestions(true)}
+          onFocus={() => { setIsFocused(true); query.length >= 2 && setShowSuggestions(true); }}
+          onBlur={() => setIsFocused(false)}
           onKeyDown={handleKeyDown}
-          placeholder="Search songs, artists..."
-          className="w-full pl-11 pr-16 py-3.5 bg-white/[0.05] rounded-2xl border border-white/[0.06] text-white placeholder-zinc-500 focus:outline-none focus:border-[#D4AF37]/40 focus:bg-white/[0.08] transition-all duration-300 text-sm gold-border-glow"
+          placeholder="Search"
+          className="w-full pl-10 pr-10 py-2.5 bg-white/[0.06] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:bg-white/[0.1] transition-all duration-200 text-[15px]"
         />
-        <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-          {query && (
-            <button
-              onClick={() => { setQuery(''); setSuggestions([]); inputRef.current?.focus(); }}
-              className="p-2 rounded-full hover:bg-white/[0.08] transition-colors"
-            >
-              <span className="material-symbols-outlined text-zinc-400 text-[18px]">close</span>
-            </button>
-          )}
+        {query && (
           <button
-            onClick={() => { if (query.trim()) doSearch(query); }}
-            className="p-2 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30 transition-colors"
+            onClick={() => { setQuery(''); setSuggestions([]); inputRef.current?.focus(); }}
+            className="absolute inset-y-0 right-3 flex items-center"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            <span className="material-symbols-outlined text-[var(--text-tertiary)] text-[18px]">close</span>
           </button>
-        </div>
+        )}
 
-        {/* Suggestions dropdown */}
+        {/* Suggestions */}
         {showSuggestions && suggestions.length > 0 && !restored.current && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900/98 backdrop-blur-xl rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden z-40">
+          <div className="absolute top-full left-0 right-0 mt-2 rounded-xl overflow-hidden z-40 glass-panel shadow-lg">
             {suggestions.map((s, i) => (
               <button
                 key={i}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.05] transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.06] transition-colors"
                 onClick={() => { setQuery(s); doSearch(s); }}
               >
-                <span className="material-symbols-outlined text-zinc-500 text-lg">search</span>
-                <span className="text-sm text-zinc-300">{s}</span>
+                <span className="material-symbols-outlined text-[var(--text-tertiary)] text-lg">search</span>
+                <span className="text-[14px] text-[var(--text-secondary)]">{s}</span>
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* No Query State */}
+      {/* Browse Categories - Show when no search */}
       {!query && !loading && (
-        <div className="max-w-2xl mx-auto space-y-8">
+        <div className="space-y-6">
+          {/* Categories Grid */}
+          <section>
+            <div className="grid grid-cols-2 gap-3">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.label}
+                  className="relative overflow-hidden rounded-xl p-4 h-24 flex items-end glass-card"
+                  style={{
+                    background: `linear-gradient(135deg, ${cat.color}22 0%, ${cat.color}08 100%)`,
+                  }}
+                >
+                  <span className="material-symbols-outlined text-3xl absolute top-3 right-3 opacity-30"
+                    style={{ color: cat.color }}>
+                    {cat.icon}
+                  </span>
+                  <span className="text-[14px] font-semibold text-[var(--text-primary)] relative z-10">
+                    {cat.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* Recent Searches */}
           {sc.searchHistory.length > 0 && (
             <section>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-[family-name:var(--font-serif)] text-white">Recent Searches</h2>
-                <button onClick={sc.clearHistory} className="text-[10px] text-zinc-500 hover:text-zinc-300 uppercase tracking-widest">Clear all</button>
+                <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">Recent Searches</h2>
+                <button onClick={sc.clearHistory} className="text-[12px] text-[var(--accent)]">Clear</button>
               </div>
-              <div className="space-y-0.5 fade-in">
-                {sc.searchHistory.slice(0, 8).map((term, i) => (
+              <div className="space-y-0">
+                {sc.searchHistory.slice(0, 5).map((term, i) => (
                   <button
                     key={`hist-${i}`}
                     onClick={() => { setQuery(term); doSearch(term); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.05] transition-colors text-left group"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors text-left"
                   >
-                    <span className="material-symbols-outlined text-zinc-500 text-lg group-hover:text-[#D4AF37] transition-colors">history</span>
-                    <span className="text-sm text-zinc-300 flex-1 truncate">{term}</span>
+                    <span className="material-symbols-outlined text-[var(--text-tertiary)] text-lg">history</span>
+                    <span className="text-[14px] text-[var(--text-secondary)] flex-1 truncate">{term}</span>
                     <span
-                      className="material-symbols-outlined text-zinc-600 text-base opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="material-symbols-outlined text-[var(--text-tertiary)] text-base"
                       onClick={e => { e.stopPropagation(); sc.removeFromHistory(term); }}
                     >close</span>
                   </button>
@@ -195,10 +218,27 @@ function SearchContent() {
             </section>
           )}
 
+          {/* Trending */}
+          <section>
+            <h2 className="text-[13px] font-semibold text-[var(--text-primary)] mb-3">Trending Searches</h2>
+            <div className="flex flex-wrap gap-2">
+              {TRENDING_SEARCHES.map((term) => (
+                <button
+                  key={term}
+                  onClick={() => { setQuery(term); doSearch(term); }}
+                  className="px-4 py-2 rounded-full bg-white/[0.06] text-[13px] text-[var(--text-secondary)] hover:bg-white/[0.1] transition-colors active:scale-95"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* Recently Played */}
           {recentlyPlayed?.length > 0 && (
             <section>
-              <h2 className="text-sm font-[family-name:var(--font-serif)] text-white mb-3">Recently Played</h2>
-              <div className="space-y-0.5 fade-in">
+              <h2 className="text-[13px] font-semibold text-[var(--text-primary)] mb-3">Recently Played</h2>
+              <div className="space-y-0">
                 {recentlyPlayed.slice(0, 5).map((track, i) => (
                   <SongCard key={`hist-${i}`} track={track} index={i} queue={recentlyPlayed} showIndex={false} />
                 ))}
@@ -206,29 +246,14 @@ function SearchContent() {
             </section>
           )}
 
-          <section>
-            <h2 className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-medium mb-3">Trending Now</h2>
-            <div className="flex flex-wrap gap-2">
-              {TRENDING_SEARCHES.map((term, i) => (
-                <button
-                  key={term}
-                  onClick={() => { setQuery(term); doSearch(term); }}
-                  className="px-4 py-2 rounded-full bg-white/[0.04] border border-white/[0.06] text-sm text-zinc-300 hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/20 hover:text-[#D4AF37] transition-all duration-300 active:scale-95 flex items-center gap-1.5"
-                >
-                  <span className="text-[10px] text-zinc-600 font-mono">{i + 1}</span>
-                  {term}
-                </button>
-              ))}
-            </div>
-          </section>
-
+          {/* Trending Music */}
           {results.length > 0 && (
             <section>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-[family-name:var(--font-serif)] text-white">Trending Music</h2>
-                <span className="text-[10px] text-zinc-600">{results.length} tracks</span>
+                <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">Top Charts</h2>
+                <span className="text-[11px] text-[var(--text-tertiary)]">{results.length} songs</span>
               </div>
-              <div className="space-y-0.5 fade-in">
+              <div className="space-y-0">
                 {results.map((track, i) => (
                   <SongCard key={`${track.source || 'yt'}-${track.id}`} track={track} index={i} queue={results} showIndex />
                 ))}
@@ -241,28 +266,28 @@ function SearchContent() {
       {/* Loading */}
       {loading && query && (
         <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 rounded-full border-2 border-[#D4AF37]/20 border-t-[#D4AF37] animate-spin" />
+          <div className="w-6 h-6 rounded-full border-2 border-[var(--accent)]/20 border-t-[var(--accent)] animate-spin" />
         </div>
       )}
 
       {/* Error */}
       {!loading && error && (
         <div className="text-center py-16 max-w-2xl mx-auto">
-          <span className="material-symbols-outlined text-5xl text-zinc-700 mb-3 block">search_off</span>
-          <p className="text-zinc-400 mb-1">{error}</p>
+          <span className="material-symbols-outlined text-5xl text-[var(--text-tertiary)] mb-3 block">search_off</span>
+          <p className="text-[var(--text-secondary)]">{error}</p>
         </div>
       )}
 
       {/* Results */}
       {!loading && !error && query && results.length > 0 && (
         <section className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-[family-name:var(--font-serif)] text-white">
-              Results for &ldquo;<span className="text-[#D4AF37]">{query}</span>&rdquo;
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">
+              Results for &ldquo;<span className="text-[var(--accent)]">{query}</span>&rdquo;
             </h2>
-            <span className="text-[10px] text-zinc-600">{results.length} tracks</span>
+            <span className="text-[11px] text-[var(--text-tertiary)]">{results.length} songs</span>
           </div>
-          <div className="space-y-0.5 fade-in">
+          <div className="space-y-0">
             {results.map((track, i) => (
               <SongCard key={`${track.source || 'yt'}-${track.id}`} track={track} index={i} queue={results} showIndex />
             ))}
@@ -277,7 +302,7 @@ export default function SearchPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center py-16">
-        <div className="w-8 h-8 rounded-full border-2 border-[#D4AF37]/20 border-t-[#D4AF37] animate-spin" />
+        <div className="w-6 h-6 rounded-full border-2 border-[var(--accent)]/20 border-t-[var(--accent)] animate-spin" />
       </div>
     }>
       <SearchContent />

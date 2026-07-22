@@ -27,7 +27,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <p className="text-xs text-zinc-600">Please refresh the page and try again</p>
           <button
             onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
-            className="mt-4 px-6 py-2 bg-[#D4AF37] text-black rounded-full text-sm font-semibold hover:bg-[#E0BF4A] transition-all"
+            className="mt-4 px-6 py-2 bg-[var(--accent)] text-white rounded-full text-sm font-semibold hover:opacity-90 transition-all"
           >
             Reload
           </button>

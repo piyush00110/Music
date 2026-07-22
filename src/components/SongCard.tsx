@@ -3,7 +3,7 @@
 import type { Track } from '@/lib/types';
 import { usePlayer } from '@/lib/PlayerContext';
 import { useState, memo } from 'react';
-import { downloadFile, getTrackDownloadUrl, getSafeFilename } from '@/lib/download';
+import { downloadFile, getTrackDownloadUrl, getSafeFilename, saveToStorage, showToast } from '@/lib/download';
 
 interface Props {
   track: Track;
@@ -19,12 +19,33 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
 
   const downloadTrack = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = getTrackDownloadUrl(track);
-    if (!url) return;
+    if (!track.youtubeId && !track.preview) return;
     setDl(true);
-    const ext = track.youtubeId ? 'm4a' : (track.preview?.includes('mp4') ? 'm4a' : 'mp3');
-    const filename = getSafeFilename(track.title, ext);
-    await downloadFile(url, filename);
+    try {
+      // Save to Supabase Storage first
+      if (track.youtubeId) {
+        showToast('Saving to library...', 'success');
+        const url = await saveToStorage(track);
+        if (url) {
+          showToast('Saved to your library!', 'success');
+        }
+      }
+      // Then download locally
+      const dlUrl = getTrackDownloadUrl(track);
+      if (dlUrl) {
+        const ext = track.youtubeId ? 'm4a' : (track.preview?.includes('mp4') ? 'm4a' : 'mp3');
+        const filename = getSafeFilename(track.title, ext);
+        await downloadFile(dlUrl, filename);
+      }
+    } catch {
+      // Fallback: just download locally
+      const dlUrl = getTrackDownloadUrl(track);
+      if (dlUrl) {
+        const ext = track.youtubeId ? 'm4a' : (track.preview?.includes('mp4') ? 'm4a' : 'mp3');
+        const filename = getSafeFilename(track.title, ext);
+        await downloadFile(dlUrl, filename);
+      }
+    }
     setDl(false);
   };
 
@@ -58,7 +79,7 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
       `}
     >
       {showIndex && (
-        <span className={`w-5 text-center text-xs font-mono flex-shrink-0 ${isCurrentTrack ? 'text-[#D4AF37]' : 'text-zinc-600'}`}>
+        <span className={`w-5 text-center text-xs font-mono flex-shrink-0 ${isCurrentTrack ? 'text-[var(--accent)]' : 'text-zinc-600'}`}>
           {(index ?? 0) + 1}
         </span>
       )}
@@ -74,7 +95,7 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className={`text-[13px] md:text-sm font-medium truncate transition-colors ${isCurrentTrack ? 'text-[#D4AF37]' : 'text-[var(--text-primary)] group-hover:text-[#D4AF37]'}`}>
+        <p className={`text-[13px] md:text-sm font-medium truncate transition-colors ${isCurrentTrack ? 'text-[var(--accent)]' : 'text-[var(--text-primary)] group-hover:text-[var(--accent)]'}`}>
           {track.title}
         </p>
         <p className="text-[11px] md:text-xs text-[var(--text-secondary)] truncate mt-0.5">{track.artist.name}</p>
@@ -104,7 +125,7 @@ export default memo(function SongCard({ track, index, queue, showIndex }: Props)
           title="Download"
         >
           {dl ? (
-            <div className="w-3 h-3 rounded-full border border-[#D4AF37]/30 border-t-[#D4AF37] animate-spin" />
+            <div className="w-3 h-3 rounded-full border border-[var(--accent)]/30 border-t-[var(--accent)] animate-spin" />
           ) : (
             <span className="material-symbols-outlined text-[14px] text-zinc-400">download</span>
           )}

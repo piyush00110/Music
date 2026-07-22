@@ -12,7 +12,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   return (
     <>
       {!isPlayer && <Header />}
-      <main className={`flex-1 ${isPlayer ? '' : 'pt-16 pb-[180px] md:pb-28'}`}>
+      <main className={`flex-1 ${isPlayer ? '' : 'pt-12 pb-[120px] md:pb-24'}`}>
         {children}
       </main>
       {!isPlayer && (

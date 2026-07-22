@@ -1,34 +1,68 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Track } from '@/lib/types';
-import { getTrending, searchMusic, GENRES } from '@/lib/music';
+import { getTrending, GENRES } from '@/lib/music';
 import SongCard from '@/components/SongCard';
 import { usePlayer } from '@/lib/PlayerContext';
 import { TOP_ARTISTS, FEATURED_PLAYLISTS, MOOD_PLAYLISTS } from '@/lib/artists';
 
 const GENRE_COLORS: Record<string, string> = {
-  'Pop': 'from-pink-500/30 to-rose-600/30',
-  'Hip-Hop': 'from-amber-500/30 to-orange-600/30',
-  'Rock': 'from-red-500/30 to-red-700/30',
-  'Electronic': 'from-cyan-500/30 to-blue-600/30',
-  'R&B': 'from-purple-500/30 to-violet-600/30',
-  'Classical': 'from-emerald-500/30 to-teal-600/30',
-  'Jazz': 'from-yellow-500/30 to-amber-600/30',
-  'Country': 'from-orange-500/30 to-red-600/30',
-  'Metal': 'from-gray-500/30 to-zinc-600/30',
-  'Folk': 'from-amber-500/30 to-yellow-600/30',
-  'Ambient': 'from-blue-500/30 to-indigo-600/30',
-  'Reggae': 'from-green-500/30 to-lime-600/30',
+  'Pop': 'from-[#ff2d55] to-[#ff6b8a]',
+  'Hip-Hop': 'from-[#ff9f0a] to-[#ffb340]',
+  'Rock': 'from-[#ff453a] to-[#ff6961]',
+  'Electronic': 'from-[#0a84ff] to-[#5ac8fa]',
+  'R&B': 'from-[#bf5af2] to-[#da8fff]',
+  'Classical': 'from-[#30d158] to-[#63e6be]',
+  'Jazz': 'from-[#ffd60a] to-[#ffcc00]',
+  'Country': 'from-[#ff9f0a] to-[#ff6b00]',
+  'Metal': 'from-[#8e8e93] to-[#636366]',
+  'Folk': 'from-[#ac8e68] to-[#c4a57b]',
+  'Ambient': 'from-[#64d2ff] to-[#40c8e0]',
+  'Reggae': 'from-[#30d158] to-[#00c7be]',
 };
 
-// Genre images removed — using gradient cards instead (no broken external URLs)
+function QuickPicksGrid({ tracks, play }: { tracks: Track[]; play: (t: Track, q: Track[]) => void }) {
+  return (
+    <div className="grid grid-cols-1 gap-2">
+      {tracks.slice(0, 6).map((track) => (
+        <button
+          key={`quick-${track.id}`}
+          onClick={() => play(track, tracks)}
+          className="flex items-center gap-3 bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] rounded-xl overflow-hidden transition-all active:scale-[0.98] group text-left"
+        >
+          <div className="w-14 h-14 flex-shrink-0 relative overflow-hidden rounded-l-xl">
+            {(track.album.cover_medium || track.youtubeId) ? (
+              <img
+                src={track.album.cover_medium || `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`}
+                alt=""
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+                <span className="material-symbols-outlined text-zinc-600 text-lg">music_note</span>
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1 pr-3">
+            <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{track.title}</p>
+            <p className="text-[11px] text-[var(--text-secondary)] truncate">{track.artist.name}</p>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 mr-3 transition-all">
+            <span className="material-symbols-outlined text-[var(--accent)] text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function HomePage() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
-  const { play } = usePlayer();
+  const { play, recentlyPlayed } = usePlayer();
   const router = useRouter();
 
   useEffect(() => {
@@ -36,9 +70,7 @@ export default function HomePage() {
       try {
         const trending = await getTrending();
         setTracks(trending);
-      } catch (err) {
-        console.error('Failed to load:', err);
-      } finally {
+      } catch {} finally {
         setLoading(false);
       }
     }
@@ -47,270 +79,204 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] pt-20">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative w-16 h-16">
-            <div className="absolute inset-0 rounded-full border border-[#D4AF37]/10" />
-            <div className="absolute inset-1 rounded-full border border-transparent border-t-[#D4AF37] animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#D4AF37]/40 text-xl">graphic_eq</span>
-            </div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative w-12 h-12">
+            <div className="absolute inset-0 rounded-full border border-[var(--accent)]/20" />
+            <div className="absolute inset-1 rounded-full border border-transparent border-t-[var(--accent)] animate-spin" />
           </div>
-          <p className="text-[10px] text-zinc-600 uppercase tracking-[0.25em]">Loading</p>
         </div>
       </div>
     );
   }
 
-  const popularGenres = GENRES.slice(0, 12);
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good Morning';
+    if (h < 18) return 'Good Afternoon';
+    return 'Good Evening';
+  })();
+
+  const recentTracks = recentlyPlayed.slice(0, 8);
 
   return (
-    <div className="px-4 md:px-8 lg:px-12 py-5 max-w-screen-xl mx-auto page-transition">
-      {/* Hero - Spotify-style greeting */}
-      <section className="relative mb-8 md:mb-10 slide-up">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#FFBF00] flex items-center justify-center shadow-lg shadow-[#D4AF37]/20">
-            <span className="material-symbols-outlined text-black text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-          </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">Good Evening</h1>
-            <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-[0.15em]">What do you want to listen to?</p>
-          </div>
-        </div>
-
-        {/* Quick picks - 2x3 grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 stagger-children">
-          {tracks.slice(0, 6).map((track, i) => (
-            <button
-              key={`quick-${track.id}`}
-              onClick={() => play(track, tracks)}
-                className="flex items-center gap-3 bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] rounded-lg overflow-hidden transition-all duration-300 active:scale-[0.98] group text-left"
-            >
-              <div className="w-12 h-12 flex-shrink-0 relative overflow-hidden">
-                {(track.album.cover_medium || track.youtubeId) ? (
-                  <img
-                    src={track.album.cover_medium || `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`}
-                    alt=""
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    onError={(e) => {
-                      const img = e.target as HTMLImageElement;
-                      if (track.youtubeId && !img.src.includes('hqdefault')) {
-                        img.src = `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`;
-                      } else {
-                        img.style.display = 'none';
-                        const parent = img.parentElement;
-                        if (parent && !parent.querySelector('.fallback-icon')) {
-                          const div = document.createElement('div');
-                          div.className = 'fallback-icon w-full h-full bg-zinc-700 flex items-center justify-center absolute inset-0';
-                          div.innerHTML = '<span class="material-symbols-outlined text-zinc-500 text-sm">music_note</span>';
-                          parent.appendChild(div);
-                        }
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-zinc-700 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-zinc-500 text-sm">music_note</span>
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 pr-2">
-                <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">{track.title}</p>
-              </div>
-            </button>
-          ))}
-        </div>
+    <div className="px-4 md:px-8 lg:px-12 py-4 max-w-screen-xl mx-auto page-transition">
+      {/* Header */}
+      <section className="mb-8 slide-up">
+        <h1 className="text-[28px] md:text-[34px] font-bold text-[var(--text-primary)] tracking-tight">{greeting}</h1>
       </section>
 
-      {/* Mood Playlists */}
-      <section className="mb-8 md:mb-10">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Browse by Mood</h2>
-        </div>
-        <div className="flex gap-2.5 overflow-x-auto pb-3 -mx-4 px-4 hide-scrollbar scroll-smooth-x">
-          {MOOD_PLAYLISTS.map((mood, i) => (
-            <a
-              key={mood.id}
-              href={`/search?q=${encodeURIComponent(mood.query)}`}
-              onClick={e => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(mood.query)}`); }}
-              className={`flex-shrink-0 w-28 md:w-32 h-36 md:h-40 rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${mood.color} border border-white/[0.06] hover:border-white/[0.15] transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] card-hover`}
-            >
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              <div className="absolute top-3 left-3 text-2xl">{mood.icon}</div>
-              <div className="absolute bottom-3 left-3 right-3">
-                <p className="text-white text-sm font-bold">{mood.mood}</p>
-              </div>
-            </a>
-          ))}
-        </div>
+      {/* Top Picks - Quick Grid (Apple Music style 2-col) */}
+      <section className="mb-8">
+        <h2 className="text-[20px] font-bold text-[var(--text-primary)] mb-4">Top Picks</h2>
+        <QuickPicksGrid tracks={tracks} play={play} />
       </section>
 
-      {/* Top Artists - Circular */}
-      <section className="mb-8 md:mb-10">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Popular Artists</h2>
-          <button onClick={() => router.push('/search?q=artists')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
-            Show all
-          </button>
-        </div>
-        <div className="flex gap-4 md:gap-6 overflow-x-auto pb-3 -mx-4 px-4 hide-scrollbar scroll-smooth-x">
-          {TOP_ARTISTS.map((artist, i) => (
-            <a
-              key={artist.id}
-              href={`/search?q=${encodeURIComponent(artist.name)}`}
-              onClick={e => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(artist.name)}`); }}
-              className="flex-shrink-0 flex flex-col items-center gap-2.5 group cursor-pointer"
-            >
-              <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden artist-circle shadow-lg shadow-black/30 bg-zinc-800">
-                <img
-                  src={artist.image}
-                  alt={artist.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    if (img.dataset.fallback) return;
-                    img.dataset.fallback = '1';
-                    img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" fill="#333"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="#D4AF37" font-size="32" font-weight="bold" font-family="sans-serif">${artist.name.charAt(0)}</text></svg>`)}`;
-                  }}
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-full bg-[#D4AF37] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-75 group-hover:scale-100 shadow-lg shadow-[#D4AF37]/30">
-                    <span className="material-symbols-outlined text-black text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
-                  </div>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-[12px] md:text-[13px] font-semibold text-white group-hover:text-[#D4AF37] transition-colors truncate max-w-[80px] md:max-w-[96px]">{artist.name}</p>
-                <p className="text-[10px] text-zinc-500 mt-0.5">Artist</p>
-              </div>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      {/* Featured Playlists - Horizontal scroll cards */}
-      <section className="mb-8 md:mb-10">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Made for You</h2>
-          <button onClick={() => router.push('/search?q=playlists')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
-            Show all
-          </button>
-        </div>
-        <div className="flex gap-3 md:gap-4 overflow-x-auto pb-3 -mx-4 px-4 hide-scrollbar scroll-smooth-x">
-          {FEATURED_PLAYLISTS.map((playlist, i) => (
-            <div
-              key={playlist.id}
-              onClick={() => router.push(`/search?q=${encodeURIComponent(playlist.title)}`)}
-              className="flex-shrink-0 w-40 md:w-44 playlist-card rounded-xl overflow-hidden bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.12] cursor-pointer group"
-            >
-              <div className={`relative w-full aspect-square bg-gradient-to-br ${playlist.gradient} overflow-hidden`}>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white/20 text-5xl">playlist_play</span>
-                </div>
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300" />
-                <button onClick={(e) => { e.stopPropagation(); router.push(`/search?q=${encodeURIComponent(playlist.title)}`); }} className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-xl shadow-[#D4AF37]/30 playlist-play-btn group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-black text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
-                </button>
-              </div>
-              <div className="p-3">
-                <p className="text-[13px] font-bold text-[var(--text-primary)] truncate">{playlist.title}</p>
-                <p className="text-[11px] text-zinc-400 truncate mt-1">{playlist.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Genres - Colorful chips */}
-      {popularGenres.length > 0 && (
-        <section className="mb-8 md:mb-10">
+      {/* Recently Played - Horizontal scroll */}
+      {recentTracks.length > 0 && (
+        <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Explore Genres</h2>
+            <h2 className="text-[20px] font-bold text-[var(--text-primary)]">Recently Played</h2>
           </div>
-          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 stagger-children">
-            {popularGenres.map(genre => (
-              <a
-                key={genre.id}
-                href={`/search?q=${genre.name}`}
-                onClick={e => { e.preventDefault(); router.push(`/search?q=${genre.name}`); }}
-                className={`h-20 md:h-24 rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${GENRE_COLORS[genre.name] || 'from-zinc-700/40 to-zinc-800/40'} border border-white/[0.06] hover:border-white/[0.15] transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] card-hover`}
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 hide-scrollbar">
+            {recentTracks.map((track) => (
+              <div
+                key={`recent-${track.id}`}
+                onClick={() => play(track, recentTracks)}
+                className="flex-shrink-0 w-[140px] md:w-[160px] rounded-xl overflow-hidden bg-[var(--bg-surface)] cursor-pointer group playlist-card"
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                <div className="absolute bottom-2.5 left-2.5 right-2.5">
-                  <p className="text-white text-[12px] md:text-sm font-bold">{genre.name}</p>
+                <div className="relative w-full aspect-square overflow-hidden">
+                  {(track.album.cover_medium || track.youtubeId) ? (
+                    <img
+                      src={track.album.cover_medium || `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`}
+                      alt=""
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-zinc-600 text-3xl">music_note</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); play(track, recentTracks); }}
+                    className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[var(--accent)] flex items-center justify-center shadow-lg playlist-play-btn"
+                  >
+                    <span className="material-symbols-outlined text-white text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                  </button>
                 </div>
-              </a>
+                <div className="p-2.5">
+                  <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">{track.title}</p>
+                  <p className="text-[10px] text-[var(--text-secondary)] truncate mt-0.5">{track.artist.name}</p>
+                </div>
+              </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* Recently Played / Recents */}
-      <section className="mb-8 md:mb-10">
+      {/* Made for You - Playlist cards */}
+      <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Recents</h2>
-          <button onClick={() => router.push('/library')} className="text-[10px] text-zinc-400 hover:text-white transition-colors uppercase tracking-wider font-medium">
-            Show all
-          </button>
+          <h2 className="text-[20px] font-bold text-[var(--text-primary)]">Made for You</h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 stagger-children">
-          {tracks.slice(0, 8).map((track, i) => (
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 hide-scrollbar">
+          {FEATURED_PLAYLISTS.map((playlist) => (
             <div
-              key={`recent-${track.id}`}
-              onClick={() => play(track, tracks)}
-              className="group rounded-xl overflow-hidden bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.12] cursor-pointer playlist-card"
+              key={playlist.id}
+              onClick={() => router.push(`/search?q=${encodeURIComponent(playlist.title)}`)}
+              className="flex-shrink-0 w-[160px] md:w-[180px] rounded-xl overflow-hidden bg-[var(--bg-surface)] cursor-pointer group playlist-card"
             >
-              <div className="relative w-full aspect-square overflow-hidden">
-                {(track.album.cover_medium || track.youtubeId) ? (
-                  <img
-                    src={track.album.cover_medium || `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`}
-                    alt=""
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                    onError={(e) => {
-                      const img = e.target as HTMLImageElement;
-                      if (track.youtubeId && !img.src.includes('hqdefault')) {
-                        img.src = `https://i.ytimg.com/vi/${track.youtubeId}/hqdefault.jpg`;
-                      } else {
-                        img.style.display = 'none';
-                        const parent = img.parentElement;
-                        if (parent && !parent.querySelector('.fallback-icon')) {
-                          const div = document.createElement('div');
-                          div.className = 'fallback-icon w-full h-full bg-zinc-800 flex items-center justify-center absolute inset-0';
-                          div.innerHTML = '<span class="material-symbols-outlined text-zinc-600 text-3xl">music_note</span>';
-                          parent.appendChild(div);
-                        }
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-zinc-600 text-3xl">music_note</span>
-                  </div>
-                )}
-                <button onClick={(e) => { e.stopPropagation(); play(track, tracks); }} className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-xl shadow-[#D4AF37]/30 playlist-play-btn group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-black text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+              <div className={`relative w-full aspect-square bg-gradient-to-br ${playlist.gradient} overflow-hidden`}>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-white/20 text-5xl">playlist_play</span>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); router.push(`/search?q=${encodeURIComponent(playlist.title)}`); }}
+                  className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[var(--accent)] flex items-center justify-center shadow-lg playlist-play-btn"
+                >
+                  <span className="material-symbols-outlined text-white text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                 </button>
               </div>
-              <div className="p-3">
-                <p className="text-[13px] font-bold text-[var(--text-primary)] truncate">{track.title}</p>
-                <p className="text-[11px] text-[var(--text-secondary)] truncate mt-1">{track.artist.name}</p>
+              <div className="p-2.5">
+                <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{playlist.title}</p>
+                <p className="text-[10px] text-[var(--text-secondary)] truncate mt-0.5">{playlist.description}</p>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Trending Now */}
-      <section className="mb-6">
+      {/* Browse by Mood */}
+      <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">Trending Now</h2>
-            <p className="text-[10px] text-zinc-500 mt-0.5 uppercase tracking-[0.15em]">From YouTube & Audius</p>
-          </div>
-          <span className="text-[10px] text-zinc-600">{tracks.length} tracks</span>
+          <h2 className="text-[20px] font-bold text-[var(--text-primary)]">Browse by Mood</h2>
         </div>
-        <div className="space-y-0.5 fade-in">
+        <div className="flex gap-2.5 overflow-x-auto pb-2 -mx-4 px-4 hide-scrollbar">
+          {MOOD_PLAYLISTS.map((mood) => (
+            <a
+              key={mood.id}
+              href={`/search?q=${encodeURIComponent(mood.query)}`}
+              onClick={(e) => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(mood.query)}`); }}
+              className={`flex-shrink-0 w-[110px] md:w-[130px] h-[130px] md:h-[140px] rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${mood.color} border border-white/[0.06] hover:border-white/[0.15] transition-all active:scale-[0.97] card-hover`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+              <div className="absolute top-3 left-3 text-2xl">{mood.icon}</div>
+              <div className="absolute bottom-3 left-3 right-3">
+                <p className="text-white text-[13px] font-bold">{mood.mood}</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* Popular Artists */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[20px] font-bold text-[var(--text-primary)]">Popular Artists</h2>
+        </div>
+        <div className="flex gap-5 overflow-x-auto pb-3 -mx-4 px-4 hide-scrollbar">
+          {TOP_ARTISTS.map((artist) => (
+            <a
+              key={artist.id}
+              href={`/search?q=${encodeURIComponent(artist.name)}`}
+              onClick={(e) => { e.preventDefault(); router.push(`/search?q=${encodeURIComponent(artist.name)}`); }}
+              className="flex-shrink-0 flex flex-col items-center gap-2 group cursor-pointer"
+            >
+              <div className="relative w-[80px] h-[80px] md:w-[100px] md:h-[100px] rounded-full overflow-hidden artist-circle shadow-lg bg-zinc-800">
+                <img
+                  src={artist.image}
+                  alt={artist.name}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  onError={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    if (img.dataset.fallback) return;
+                    img.dataset.fallback = '1';
+                    img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" fill="#2c2c2e"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="#fc3c44" font-size="32" font-weight="bold" font-family="sans-serif">${artist.name.charAt(0)}</text></svg>`)}`;
+                  }}
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 scale-75 group-hover:scale-100 shadow-lg">
+                    <span className="material-symbols-outlined text-white text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center">
+                <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate max-w-[80px]">{artist.name}</p>
+                <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">Artist</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* Genres */}
+      <section className="mb-8">
+        <h2 className="text-[20px] font-bold text-[var(--text-primary)] mb-4">Browse by Genre</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 stagger-children">
+          {GENRES.slice(0, 8).map((genre) => (
+            <a
+              key={genre.id}
+              href={`/search?q=${genre.name}`}
+              onClick={(e) => { e.preventDefault(); router.push(`/search?q=${genre.name}`); }}
+              className={`h-[80px] md:h-[100px] rounded-xl overflow-hidden relative group cursor-pointer bg-gradient-to-br ${GENRE_COLORS[genre.name] || 'from-zinc-700 to-zinc-800'} border border-white/[0.06] hover:border-white/[0.15] transition-all active:scale-[0.97] card-hover`}
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+              <div className="absolute bottom-3 left-3 right-3">
+                <p className="text-white text-[14px] font-bold">{genre.name}</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* Trending Now */}
+      <section className="mb-20">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[20px] font-bold text-[var(--text-primary)]">Trending Now</h2>
+        </div>
+        <div className="space-y-0.5">
           {tracks.map((track, i) => (
             <SongCard key={`${track.source || 'yt'}-${track.id}`} track={track} index={i} queue={tracks} showIndex />
           ))}

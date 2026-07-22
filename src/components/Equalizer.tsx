@@ -31,8 +31,8 @@ export default function Equalizer() {
               onClick={() => setEqualizer('mode', ['normal', 'headphone', 'speaker'].indexOf(mode))}
               className={`px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider transition-all ${
                 equalizer.mode === mode
-                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/40'
-                  : 'text-zinc-500 border border-white/5 hover:border-[#D4AF37]/20 hover:text-zinc-300'
+                  ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/40'
+                  : 'text-zinc-500 border border-white/5 hover:border-[var(--accent)]/20 hover:text-zinc-300'
               }`}
             >
               {mode === 'normal' ? 'Normal' : mode === 'headphone' ? '🎧 Headphone' : '🔊 Speaker'}
@@ -49,8 +49,8 @@ export default function Equalizer() {
             onClick={() => setEqualizer('preset', PRESETS.indexOf(p))}
             className={`px-3 py-1 rounded-full text-[10px] transition-all ${
               equalizer.preset === p
-                ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/40'
-                : 'text-zinc-500 border border-white/5 hover:border-[#D4AF37]/20 hover:text-zinc-300'
+                ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/40'
+                : 'text-zinc-500 border border-white/5 hover:border-[var(--accent)]/20 hover:text-zinc-300'
             }`}
           >
             {p}
@@ -79,8 +79,8 @@ export default function Equalizer() {
                   style={{
                     height: `${pct}%`,
                     background: val > 0
-                      ? 'linear-gradient(to top, #D4AF37, #FFBF00)'
-                      : 'linear-gradient(to top, rgba(212,175,55,0.3), rgba(212,175,55,0.1))',
+                      ? 'linear-gradient(to top, var(--accent), var(--accent-hover))'
+                      : 'linear-gradient(to top, rgba(252,60,68,0.3), rgba(252,60,68,0.1))',
                   }}
                 />
                 {/* Frequency response curve overlay */}
@@ -92,7 +92,7 @@ export default function Equalizer() {
                       <line
                         x1="0%" y1={`${100 - pct}%`}
                         x2="100%" y2={`${100 - nextPct}%`}
-                        stroke="rgba(212,175,55,0.2)"
+                        stroke="rgba(252,60,68,0.2)"
                         strokeWidth="1"
                       />
                     </svg>

@@ -10,7 +10,7 @@ interface Props {
   glow?: boolean;
 }
 
-export default function EnhancedVisualizer({ isPlaying, barCount = 64, height = 120, color = '#D4AF37', glow = true }: Props) {
+export default function EnhancedVisualizer({ isPlaying, barCount = 64, height = 120, color = '#fc3c44', glow = true }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const barsRef = useRef<number[]>([]);
@@ -53,7 +53,7 @@ export default function EnhancedVisualizer({ isPlaying, barCount = 64, height = 
 
         const gradient = ctx.createLinearGradient(x, height - h, x, height);
         gradient.addColorStop(0, color);
-        gradient.addColorStop(0.5, '#FFBF00');
+        gradient.addColorStop(0.5, '#ff5a5f');
         gradient.addColorStop(1, color);
 
         ctx.fillStyle = gradient;

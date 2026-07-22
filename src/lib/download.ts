@@ -1,5 +1,38 @@
 'use client';
 
+export async function saveToStorage(track: { youtubeId?: string; title: string }): Promise<string | null> {
+  if (!track.youtubeId) return null;
+  try {
+    const res = await fetch('/api/save-to-storage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ youtubeId: track.youtubeId, title: track.title }),
+      signal: AbortSignal.timeout(180000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.url || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getStoredSongUrl(youtubeId: string, title: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/save-to-storage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ youtubeId, title }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.cached ? data.url : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadFile(url: string, filename: string): Promise<boolean> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
@@ -83,7 +116,7 @@ export function getSafeFilename(title: string, ext: string = 'm4a'): string {
   return `${safe || 'song'}.${ext}`;
 }
 
-function showToast(msg: string, type: 'success' | 'error') {
+export function showToast(msg: string, type: 'success' | 'error') {
   if (typeof document === 'undefined') return;
   const existing = document.getElementById('dl-toast');
   if (existing) existing.remove();

@@ -7,6 +7,7 @@ export interface Track {
   preview: string;
   youtubeId?: string;
   source?: 'youtube' | 'audius' | 'deezer' | 'itunes';
+  storedUrl?: string;
 }
 
 export type AudioQuality = 'low' | 'mid' | 'high';

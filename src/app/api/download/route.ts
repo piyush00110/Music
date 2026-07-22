@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-// Get audio stream URL from YouTube page scrape
+// Get highest quality audio stream URL from YouTube page scrape
 async function getYouTubeAudioUrl(videoId: string): Promise<string | null> {
   try {
     const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
@@ -17,13 +17,18 @@ async function getYouTubeAudioUrl(videoId: string): Promise<string | null> {
     if (!m) return null;
     const data = JSON.parse(m[1]);
     const fmts = data?.streamingData?.adaptiveFormats || data?.streamingData?.formats || [];
-    const audio = fmts.filter((f: any) => f.mimeType?.startsWith('audio'));
-    audio.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+    const audio = fmts
+      .filter((f: any) => f.mimeType?.startsWith('audio'))
+      .sort((a: any, b: any) => {
+        const aBitrate = parseInt(String(a.bitrate || a.averageBitrate || 0));
+        const bBitrate = parseInt(String(b.bitrate || b.averageBitrate || 0));
+        return bBitrate - aBitrate;
+      });
     return audio[0]?.url || null;
   } catch { return null; }
 }
 
-// Get audio stream URL from Invidious
+// Get audio stream URL from Invidious (highest bitrate)
 async function getInvidiousAudioUrl(videoId: string): Promise<string | null> {
   const instances = [
     'https://vid.puffyan.us',
@@ -46,7 +51,7 @@ async function getInvidiousAudioUrl(videoId: string): Promise<string | null> {
   return null;
 }
 
-// Get audio stream URL from cobalt
+// Get audio stream URL from cobalt (best quality)
 async function getCobaltAudioUrl(videoId: string): Promise<string | null> {
   const hosts = ['https://api.cobalt.tools', 'https://co.wuk.sh'];
   for (const host of hosts) {
@@ -56,7 +61,7 @@ async function getCobaltAudioUrl(videoId: string): Promise<string | null> {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({
           url: `https://www.youtube.com/watch?v=${videoId}`,
-          audioFormat: 'mp3',
+          audioFormat: 'best',
           isAudioOnly: true,
         }),
         signal: AbortSignal.timeout(15000),
@@ -74,6 +79,11 @@ export async function GET(request: Request) {
   const id = searchParams.get('id');
   const title = searchParams.get('title') || 'audio';
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+  // Validate video ID format
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) {
+    return NextResponse.json({ error: 'Invalid video id' }, { status: 400 });
+  }
 
   const safe = title.replace(/[^\w\s-]/g, '').trim() || 'song';
 
